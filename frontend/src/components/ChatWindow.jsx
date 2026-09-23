@@ -89,41 +89,6 @@ export default function ChatWindow({
       return;
     }
 
-    // Try Web Speech API for instantaneous transcription if available
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (SpeechRecognition) {
-      try {
-        const recognition = new SpeechRecognition();
-        const langMap = {
-          hi: "hi-IN",
-          mr: "mr-IN",
-          sa: "sa-IN",
-          gu: "gu-IN",
-          ta: "ta-IN",
-          te: "te-IN",
-          en: "en-US"
-        };
-        recognition.lang = langMap[selectedLanguage] || "en-US";
-        recognition.interimResults = false;
-        recognition.maxAlternatives = 1;
-
-        recognition.onresult = (event) => {
-          const transcript = event.results[0][0].transcript;
-          if (transcript) {
-            setInputText((prev) => (prev ? `${prev} ${transcript}` : transcript));
-          }
-        };
-
-        recognition.onerror = (e) => {
-          console.warn("Web Speech recognition error, relying on whisper.cpp:", e);
-        };
-
-        recognition.start();
-      } catch (e) {
-        console.warn("SpeechRecognition init note:", e);
-      }
-    }
-
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioChunksRef.current = [];
@@ -140,15 +105,15 @@ export default function ChatWindow({
         stream.getTracks().forEach((track) => track.stop());
         const audioBlob = new Blob(audioChunksRef.current, { type: "audio/wav" });
 
-        if (audioBlob.size > 1000) {
+        if (audioBlob.size > 500) {
           setTranscribing(true);
           try {
             const data = await uploadAndTranscribeAudio(audioBlob, selectedLanguage);
             if (data && data.text && data.text.trim()) {
-              setInputText((prev) => (prev ? `${prev} ${data.text}` : data.text));
+              setInputText(data.text.trim());
             }
           } catch (err) {
-            console.warn("whisper.cpp upload error:", err);
+            console.warn("[Voice] whisper.cpp local transcription error:", err);
           } finally {
             setTranscribing(false);
           }
@@ -243,7 +208,9 @@ export default function ChatWindow({
             type="text"
             className="chat-input"
             placeholder={
-              selectedLanguage === "mr"
+              transcribing
+                ? "🎙️ Transcribing audio with local whisper.cpp (offline)..."
+                : selectedLanguage === "mr"
                 ? "आयुर्वेद, खोकला, वात-पित्त-कफ, दिनचर्या, किंवा औषधी वनस्पतींबद्दल विचारा..."
                 : selectedLanguage === "hi"
                 ? "आयुर्वेद, वात-पित्त-कफ, दिनचर्या, या जड़ी-बूटियों के बारे में पूछें..."
