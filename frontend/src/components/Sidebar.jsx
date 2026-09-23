@@ -16,7 +16,7 @@ export default function Sidebar({
       <div className="sidebar-header">
         <div className="brand-wrapper">
           <div className="brand-logo-icon">🌿</div>
-          <div>
+          <div className="brand-text-col">
             <h1 className="brand-title">AyurBot</h1>
             <div className="brand-subtitle">Knowledge Assistant</div>
           </div>

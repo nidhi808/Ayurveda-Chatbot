@@ -128,7 +128,7 @@ export default function ChatWindow({
   };
 
   return (
-    <div className="main-wrapper">
+    <div className="chat-window">
       <div className="chat-scroll-container">
         <div className="chat-content-width">
           {messages.length === 0 ? (
