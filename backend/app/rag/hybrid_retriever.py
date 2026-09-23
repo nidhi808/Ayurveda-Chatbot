@@ -18,25 +18,36 @@ class HybridRetriever:
         """
         Executes hybrid search combining vector similarity and BM25 rankings.
         """
-        candidate_k = max(25, top_k * 6)
-        vector_results = vector_store.search(query, top_k=candidate_k, category=category)
-        bm25_results = bm25_retriever.search(query, top_k=candidate_k, category=category)
+        candidate_k = max(30, top_k * 6)
+        # Search global candidate pool so queries targeting other classical domains are never dropped
+        vector_results = vector_store.search(query, top_k=candidate_k, category=None)
+        bm25_results = bm25_retriever.search(query, top_k=candidate_k, category=None)
 
-        # Reciprocal Rank Fusion (RRF) with balanced weights
+        # Reciprocal Rank Fusion (RRF) with balanced weights & category prioritization boost
         doc_scores: Dict[str, float] = {}
         doc_map: Dict[str, Dict[str, Any]] = {}
+
+        has_category_filter = bool(category and category.lower() != "all")
+        target_cat = category.lower() if has_category_filter else ""
 
         for rank, item in enumerate(vector_results, 1):
             doc_id = item["id"]
             doc_map[doc_id] = item
-            doc_scores[doc_id] = doc_scores.get(doc_id, 0.0) + (1.0 / (self.rrf_k + rank))
+            base_score = 1.0 / (self.rrf_k + rank)
+            # Prioritize documents matching the active category
+            if has_category_filter and item.get("category", "").lower() == target_cat:
+                base_score *= 1.35
+            doc_scores[doc_id] = doc_scores.get(doc_id, 0.0) + base_score
 
         for rank, item in enumerate(bm25_results, 1):
             doc_id = item["id"]
             if doc_id not in doc_map:
                 doc_map[doc_id] = item
-            # Boost exact keyword matches significantly for domain terms
-            doc_scores[doc_id] = doc_scores.get(doc_id, 0.0) + (1.0 / (self.rrf_k + rank)) * 1.2
+            # Boost exact keyword matches significantly for classical domain terms
+            base_score = (1.0 / (self.rrf_k + rank)) * 1.5
+            if has_category_filter and item.get("category", "").lower() == target_cat:
+                base_score *= 1.35
+            doc_scores[doc_id] = doc_scores.get(doc_id, 0.0) + base_score
 
         # Rank by fused score
         sorted_ids = sorted(doc_scores.keys(), key=lambda d_id: doc_scores[d_id], reverse=True)

@@ -87,9 +87,14 @@ export default function App() {
     }
   };
 
-  const handleSendMessage = async (queryText) => {
+  const handleSendMessage = async (queryText, overrideCategory) => {
     const text = queryText || inputText;
     if (!text.trim() || loading) return;
+
+    if (overrideCategory !== undefined) {
+      setSelectedCategory(overrideCategory);
+    }
+    const targetCategory = overrideCategory !== undefined ? overrideCategory : selectedCategory;
 
     const userMessage = {
       role: "user",
@@ -106,7 +111,7 @@ export default function App() {
       const response = await sendChatMessage({
         conversation_id: activeConversationId,
         message: text,
-        category: selectedCategory,
+        category: targetCategory,
         language: selectedLanguage
       });
 
@@ -207,6 +212,7 @@ export default function App() {
           onSendMessage={handleSendMessage}
           loading={loading}
           selectedCategory={selectedCategory}
+          onSelectCategory={(cat) => setSelectedCategory(cat)}
           selectedLanguage={selectedLanguage}
           onSelectPrompt={handleSelectPrompt}
           onSelectSource={(source) => setActiveSource(source)}

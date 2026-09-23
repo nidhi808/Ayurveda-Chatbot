@@ -49,6 +49,7 @@ export default function ChatWindow({
   onSendMessage,
   loading,
   selectedCategory,
+  onSelectCategory,
   selectedLanguage,
   onSelectPrompt,
   onSelectSource
@@ -165,7 +166,7 @@ export default function ChatWindow({
                 key={index}
                 message={msg}
                 onSelectSource={onSelectSource}
-                onSelectFollowup={(q) => onSendMessage(q)}
+                onSelectFollowup={(q) => onSendMessage(q, "All")}
               />
             ))
           )}
@@ -190,6 +191,8 @@ export default function ChatWindow({
         <form className="input-box-wrapper" onSubmit={handleSubmit}>
           {selectedCategory && selectedCategory !== "All" && (
             <span
+              onClick={() => onSelectCategory && onSelectCategory("All")}
+              title="Click to remove category filter (search across all Ayurvedic categories)"
               style={{
                 fontSize: "12px",
                 background: "#e8efe9",
@@ -197,10 +200,16 @@ export default function ChatWindow({
                 padding: "3px 8px",
                 borderRadius: "12px",
                 fontWeight: "600",
-                whiteSpace: "nowrap"
+                whiteSpace: "nowrap",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "5px",
+                cursor: "pointer",
+                transition: "all 0.15s ease"
               }}
             >
-              {selectedCategory}
+              <span>{selectedCategory}</span>
+              <span style={{ fontSize: "11px", fontWeight: "bold", opacity: 0.7 }}>✕</span>
             </span>
           )}
 

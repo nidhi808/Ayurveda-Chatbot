@@ -192,9 +192,25 @@ Please provide an educational, clear, and grounded explanation based strictly on
         content = primary.content or primary.snippet or ""
         response_parts.append(f"{content}\n")
 
+        # Check if any secondary citations were explicitly queried (e.g. comparing Ritucharya and Dinacharya)
+        matching_secondary = []
         if len(citations) > 1:
-            response_parts.append("#### Key Principles & Classical Insights\n")
             for c in citations[1:]:
+                title_words = [w.lower() for w in re.findall(r'[a-zA-Z]{4,}', c.title)]
+                if any(w in q_lower for w in title_words):
+                    matching_secondary.append(c)
+
+        if matching_secondary:
+            for sec in matching_secondary:
+                response_parts.append(f"### {sec.title}\n")
+                sec_content = sec.content or sec.snippet or ""
+                response_parts.append(f"{sec_content}\n")
+
+        # Key principles from remaining citations
+        remaining = [c for c in citations[1:] if c not in matching_secondary]
+        if remaining:
+            response_parts.append("#### Key Principles & Classical Insights\n")
+            for c in remaining:
                 first_sentence = (c.content or c.snippet or "").split(". ")[0]
                 if first_sentence:
                     response_parts.append(f"• **{c.title}**: {first_sentence}.")
