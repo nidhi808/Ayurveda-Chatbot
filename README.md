@@ -96,7 +96,7 @@ flowchart TB
         Life["Dinacharya, Ritucharya & Tridosha Principles"]
     end
 
-    UI -->|Voice Audio Stream (WAV)| WhisperCpp
+    UI -->|Voice Audio Stream WAV| WhisperCpp
     WhisperCpp -->|Offline Transcribed Text| UI
     UI -->|HTTP Request with Language & Category| Router
     Router --> Memory
@@ -134,25 +134,25 @@ sequenceDiagram
     participant RAG as Hybrid Retriever (Vector+BM25)
     participant Generator as LLM / Grounded Synthesizer
 
-    User->>UI: Selects Language (e.g., मराठी) & types "khokla sathi aushadh"
+    User->>UI: Selects Language (e.g., Marathi) & enters query
     opt Voice Input (100% Offline On-Device)
-        User->>UI: Clicks Microphone & Speaks (e.g., in Marathi or English)
+        User->>UI: Clicks Microphone & Speaks
         UI->>Backend: POST /api/transcribe (Audio WAV)
-        Backend->>WhisperCpp: Local CPU Inference via pywhispercpp (ggml-tiny.bin)
+        Backend->>WhisperCpp: Local CPU Inference via pywhispercpp (ggml-tiny)
         WhisperCpp-->>Backend: Transcribed text (0 external network calls)
-        Backend-->>UI: { text: "khokla sathi aushadh" }
+        Backend-->>UI: Transcribed text
     end
-    UI->>Backend: POST /api/chat { message, language: "mr", category }
+    UI->>Backend: POST /api/chat { message, language, category }
     Backend->>Safety: Layer 1: Evaluate Input Safety
     alt Emergency / Direct Prescription Query
         Safety-->>Backend: Intercept! Return Emergency / Non-diagnostic notice
         Backend-->>UI: Refusal with Medical Safety Alert
     else Safe Educational Query
         Safety-->>Backend: Passed
-        Backend->>RAG: Expand Query ("khokla" -> "kasa, tulsi, yashtimadhu, sitopaladi, cough")
+        Backend->>RAG: Expand Query (e.g., khokla to classical remedies)
         RAG-->>Backend: Top-K Verified Document Citations (API & Samhitas)
-        Backend->>Generator: Generate Grounded Answer (Language: "mr", Context: Citations)
-        Generator-->>Backend: Pure Marathi Response + Practical Ayurvedic Remedies
+        Backend->>Generator: Generate Grounded Answer (Target Language & Citations)
+        Generator-->>Backend: Pure Marathi/Hindi/English Response + Practical Remedies
         Backend->>Safety: Layer 2: Output Validation & Disclaimer Injection
         Backend-->>UI: ChatResponse { answer, sources, followups, language }
     end
