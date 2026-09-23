@@ -1,0 +1,69 @@
+from typing import List, Dict, Any, Optional
+from backend.app.rag.vector_store import vector_store
+from backend.app.rag.bm25_retriever import bm25_retriever
+from backend.app.models import SourceCitation, DocumentChunk
+
+class HybridRetriever:
+    """Fuses Vector Semantic Search and BM25 Keyword Search using Reciprocal Rank Fusion."""
+
+    def __init__(self, rrf_k: int = 60):
+        self.rrf_k = rrf_k
+
+    def retrieve(
+        self,
+        query: str,
+        top_k: int = 4,
+        category: Optional[str] = None
+    ) -> List[SourceCitation]:
+        """
+        Executes hybrid search combining vector similarity and BM25 rankings.
+        """
+        candidate_k = max(25, top_k * 6)
+        vector_results = vector_store.search(query, top_k=candidate_k, category=category)
+        bm25_results = bm25_retriever.search(query, top_k=candidate_k, category=category)
+
+        # Reciprocal Rank Fusion (RRF) with balanced weights
+        doc_scores: Dict[str, float] = {}
+        doc_map: Dict[str, Dict[str, Any]] = {}
+
+        for rank, item in enumerate(vector_results, 1):
+            doc_id = item["id"]
+            doc_map[doc_id] = item
+            doc_scores[doc_id] = doc_scores.get(doc_id, 0.0) + (1.0 / (self.rrf_k + rank))
+
+        for rank, item in enumerate(bm25_results, 1):
+            doc_id = item["id"]
+            if doc_id not in doc_map:
+                doc_map[doc_id] = item
+            # Boost exact keyword matches significantly for domain terms
+            doc_scores[doc_id] = doc_scores.get(doc_id, 0.0) + (1.0 / (self.rrf_k + rank)) * 1.2
+
+        # Rank by fused score
+        sorted_ids = sorted(doc_scores.keys(), key=lambda d_id: doc_scores[d_id], reverse=True)
+
+        final_citations: List[SourceCitation] = []
+        for doc_id in sorted_ids[:top_k]:
+            data = doc_map[doc_id]
+            fused_score = doc_scores[doc_id]
+            full_text = data.get("content", "")
+            snippet = full_text[:280] + "..." if len(full_text) > 280 else full_text
+
+            citation = SourceCitation(
+                id=data["id"],
+                title=data.get("title", "Ayurvedic Knowledge Reference"),
+                category=data.get("category", "General"),
+                subcategory=data.get("subcategory"),
+                section=data.get("section"),
+                page=data.get("page"),
+                source=data.get("source", "Classical Ayurveda Reference"),
+                source_url=data.get("source_url"),
+                snippet=snippet,
+                content=full_text,
+                score=round(fused_score, 4)
+            )
+            final_citations.append(citation)
+
+        return final_citations
+
+# Global hybrid retriever
+hybrid_retriever = HybridRetriever()

@@ -1,0 +1,41 @@
+[
+  {
+    "id": "comp_001",
+    "title": "Comparative Analysis — Vata vs. Pitta vs. Kapha Doshas",
+    "category": "Doshas",
+    "subcategory": "Comparative",
+    "content": "A comparative overview of the three doshas highlights their distinct physiological functions, elements, and attributes: 1. Elemental Makeup: Vata is Ether + Air; Pitta is Fire + Water; Kapha is Water + Earth. 2. Primary Role: Vata is Kinetic/Catabolic (movement, nerve transmission, excretion); Pitta is Metabolic/Transformative (digestion, enzymatic reactions, heat); Kapha is Structural/Anabolic (cohesion, growth, lubrication). 3. Thermal Nature: Vata is Cold (Sheeta); Pitta is Hot (Ushna); Kapha is Cold (Sheeta). 4. Moisture Nature: Vata is Dry (Ruksha); Pitta is Lightly Oily (Sasneha); Kapha is Very Oily/Unctuous (Snigdha). 5. Weight/Density: Vata is Light (Laghu); Pitta is Light (Laghu); Kapha is Heavy (Guru). 6. Primary Seat in Body: Vata resides primarily in the colon (Pakwashaya), pelvis, and bones; Pitta resides in the small intestine (Grahani), stomach, and liver; Kapha resides in the chest (Uras), throat, and head.",
+    "source": "Ashtanga Hridaya — Sutrasthana (Educational Translation)",
+    "source_url": "https://ayush.gov.in",
+    "section": "Sutrasthana Chapter 1: Ayushkamiya Adhyaya",
+    "page": 4,
+    "language": "English",
+    "year": 2021
+  },
+  {
+    "id": "text_001",
+    "title": "Classical Ayurveda Literature — The Brihat Trayi (Great Triad)",
+    "category": "Traditional Concepts",
+    "subcategory": "Literature",
+    "content": "The authoritative corpus of classical Ayurveda is anchored in the 'Brihat Trayi' (The Great Three Treatises): 1. Charaka Samhita: Primarily attributed to Acharya Charaka, focusing predominantly on Kaya Chikitsa (internal medicine), foundational philosophy, epistemology, etiology (Nidana), and therapeutics. Emphasizes mind-body balance and lifestyle. 2. Sushruta Samhita: Attributed to Acharya Sushruta, known globally as the pioneer of surgery (Shalya Chikitsa); details surgical procedures, rhinoplasty, anatomical dissections (Sharira), surgical instruments, and trauma management. 3. Ashtanga Hridaya / Ashtanga Sangraha: Composed by Acharya Vagbhata; brilliantly synthesizes and condenses the core teachings of both Charaka and Sushruta into poetic, memorable Sanskrit verses covering all eight clinical branches of Ayurveda (Ashtanga Ayurveda).",
+    "source": "History of Indian Medicine and AYUSH Research",
+    "source_url": "https://ccras.nic.in",
+    "section": "Classical Heritage: Overview of Brihat Trayi",
+    "page": 1,
+    "language": "English",
+    "year": 2023
+  },
+  {
+    "id": "text_002",
+    "title": "The Eight Clinical Branches — Ashtanga Ayurveda",
+    "category": "Traditional Concepts",
+    "subcategory": "Branches",
+    "content": "Ayurveda traditionally encompasses eight specialized medical branches, termed Ashtanga Ayurveda: 1. Kaya Chikitsa: Internal medicine and general systemic disorders. 2. Shalya Tantra: Surgical techniques, wound care, and foreign body extraction. 3. Shalakya Tantra: Disorders of the ear, nose, throat, eyes, and oral cavity (supraclavicular medicine). 4. Kaumarabhritya: Pediatrics, obstetrics, and gynecology. 5. Agada Tantra: Toxicology, poisons, and environmental hazards. 6. Rasayana Tantra: Rejuvenation, geriatrics, longevity science, and cellular vitalization. 7. Vajikarana Tantra: Virility, reproductive health, and healthy progeny. 8. Bhuta Vidya (Graha Chikitsa): Psychotherapy and psycho-spiritual health. Together, these branches provided a comprehensive healthcare matrix in classical India.",
+    "source": "Ministry of AYUSH — Classical Ayurvedic Frameworks",
+    "source_url": "https://ayush.gov.in",
+    "section": "Introduction to the Eight Branches of Ayurveda",
+    "page": 8,
+    "language": "English",
+    "year": 2023
+  }
+]
