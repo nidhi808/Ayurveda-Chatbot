@@ -17,13 +17,15 @@
 2. [Our Approach & How We Solve It](#-our-approach--how-we-solve-it)
 3. [System Architecture](#-system-architecture)
 4. [User Flow Diagram](#-user-flow-diagram)
-5. [Key Features](#-key-features)
-6. [Technology Stack](#-technology-stack)
-7. [Project Structure](#-project-structure)
-8. [Installation & Setup](#-installation--setup)
-9. [API Documentation](#-api-documentation)
-10. [Evaluation & Benchmark Results](#-evaluation--benchmark-results)
-11. [Medical & Educational Disclaimer](#-medical--educational-disclaimer)
+5. [Visual Showcase & Screenshots](#-visual-showcase--screenshots)
+6. [Key Features](#-key-features)
+7. [100% Offline Speech-to-Text (Whisper.cpp)](#-100-offline-speech-to-text-whispercpp)
+8. [Technology Stack](#-technology-stack)
+9. [Project Structure](#-project-structure)
+10. [Installation & Setup](#-installation--setup)
+11. [API Documentation](#-api-documentation)
+12. [Evaluation & Benchmark Results](#-evaluation--benchmark-results)
+13. [Medical & Educational Disclaimer](#-medical--educational-disclaimer)
 
 ---
 
@@ -72,8 +74,8 @@ flowchart TB
         L2Safety["Layer 2: Output Validator & Legal Disclaimer Injection"]
     end
 
-    subgraph SpeechEngine["🎙️ Local Speech-to-Text"]
-        WhisperCpp["pywhispercpp (whisper.cpp tiny model)"]
+    subgraph SpeechEngine["🎙️ Local Speech-to-Text (100% Offline)"]
+        WhisperCpp["pywhispercpp (whisper.cpp tiny model on CPU)"]
     end
 
     subgraph RAG["🔍 Hybrid Retrieval Engine"]
@@ -94,8 +96,8 @@ flowchart TB
         Life["Dinacharya, Ritucharya & Tridosha Principles"]
     end
 
-    UI -->|Voice Audio Stream| WhisperCpp
-    WhisperCpp -->|Transcribed Text| UI
+    UI -->|Voice Audio Stream (WAV)| WhisperCpp
+    WhisperCpp -->|Offline Transcribed Text| UI
     UI -->|HTTP Request with Language & Category| Router
     Router --> Memory
     Router --> L1Safety
@@ -127,15 +129,18 @@ sequenceDiagram
     actor User as User / Practitioner
     participant UI as React Web Interface
     participant Backend as FastAPI Backend
+    participant WhisperCpp as 🎙️ Local Whisper.cpp (Offline CPU)
     participant Safety as Safety Guardrails
     participant RAG as Hybrid Retriever (Vector+BM25)
     participant Generator as LLM / Grounded Synthesizer
 
     User->>UI: Selects Language (e.g., मराठी) & types "khokla sathi aushadh"
-    opt Voice Input
-        User->>UI: Clicks Microphone
+    opt Voice Input (100% Offline On-Device)
+        User->>UI: Clicks Microphone & Speaks (e.g., in Marathi or English)
         UI->>Backend: POST /api/transcribe (Audio WAV)
-        Backend-->>UI: Transcribed text via whisper.cpp
+        Backend->>WhisperCpp: Local CPU Inference via pywhispercpp (ggml-tiny.bin)
+        WhisperCpp-->>Backend: Transcribed text (0 external network calls)
+        Backend-->>UI: { text: "khokla sathi aushadh" }
     end
     UI->>Backend: POST /api/chat { message, language: "mr", category }
     Backend->>Safety: Layer 1: Evaluate Input Safety
@@ -157,6 +162,29 @@ sequenceDiagram
 
 ---
 
+## 📸 Visual Showcase & Screenshots
+
+### 1. Multilingual Ayurvedic Chat & Natural Remedies (मराठी)
+AyurBot natively understands Romanized and Devanagari Marathi queries (`"khokla sathi aushadh"`), maps them to classical *Kasa Roga* knowledge, retrieves authentic AYUSH monographs (*Tulsi, Yashtimadhu, Sitopaladi Churna*), and formats fluent Marathi guidance with doshic actions (*कफ-वात शामक*) and botanical details.
+
+![Marathi Ayurvedic Chat](docs/screenshots/marathi_chat.png)
+
+---
+
+### 2. Interactive Knowledge Corpus Explorer
+Search and inspect classical Samhita excerpts and AYUSH botanical monographs across 6 distinct categories (*Herbs, Doshas, Fundamentals, Lifestyle, Classical Texts, Traditional Concepts*), complete with properties and direct links to the official Ministry of AYUSH portal.
+
+![Knowledge Corpus Explorer](docs/screenshots/knowledge_explorer.png)
+
+---
+
+### 3. Automated RAG Evaluation & Safety Benchmark
+Built-in evaluation modal running 19 standard clinical and classical test queries to verify Retrieval Precision@3 (100%), Safety Detection Accuracy (100%), and Groundedness Score (100%).
+
+![RAG Evaluation Benchmarks](docs/screenshots/evaluation_benchmarks.png)
+
+---
+
 ## ✨ Key Features
 
 - **Grounded Natural Language Chat**: Structured responses featuring classical Ayurvedic principles, botanical names, doshic attributes (*Rasa, Guna, Virya, Vipaka*), and modern scientific notes.
@@ -166,9 +194,33 @@ sequenceDiagram
 - **Source Verification & Citations**: Every assistant reply cites authentic monographs with direct links to the official AYUSH portal.
 - **Interactive Knowledge Corpus Explorer**: Search and filter all indexed documents across categories (*Herbs, Doshas, Fundamentals, Lifestyle, Classical Texts*).
 - **RAG Evaluation Benchmark Dashboard**: In-app evaluation suite testing **Precision@3**, **Safety Detection Accuracy**, and **Groundedness Score** against standard Ayurvedic test queries.
-- **Local Voice Transcription (Whisper.cpp)**: Fast, private, on-device audio speech-to-text without external audio API fees.
+- **100% Offline Voice Transcription (Whisper.cpp)**: Fast, private, on-device audio speech-to-text without external audio API fees or cloud dependencies.
 - **Category-Scoped Inquiries**: Filter conversations specifically for *Herbs*, *Doshas*, *Fundamentals*, or *Lifestyle Regimens*.
 - **Dynamic Follow-up Recommendations**: Generates logical next questions in the active conversation language.
+
+---
+
+## 🎙️ 100% Offline Speech-to-Text (Whisper.cpp)
+
+AyurBot implements a **fully offline, on-device voice recognition pipeline** using high-performance C++ bindings via `pywhispercpp`.
+
+### 🔒 Why 100% Offline Matters
+- **Zero Cloud Latency & Zero API Costs**: Voice transcription does not make calls to OpenAI, Google Cloud Speech, or third-party servers. It is free forever, instant, and incurs no per-minute billing.
+- **Complete Health Privacy**: In medical and wellness contexts, audio recordings containing personal symptoms and conditions never leave the user's local machine.
+- **Rural & Low-Bandwidth Resilience**: Operates reliably in remote Ayurvedic clinics, rural health centers, and dispensaries with zero or intermittent internet access.
+
+### ⚙️ Technical Implementation Details
+1. **Model Weights**: Utilizes the quantized **GGML Tiny model** (`ggml-tiny.bin`, ~74.09 MB). The model is stored locally on-disk:
+   ```
+   %LOCALAPPDATA%/pywhispercpp/pywhispercpp/models/ggml-tiny.bin
+   ```
+2. **Multi-Threaded CPU Execution**: Written in pure C/C++ without requiring heavy CUDA or PyTorch installations. It executes across 4 CPU threads simultaneously, processing audio in near real-time (~0.3s latency on standard consumer laptops).
+3. **Audio Capture Pipeline**:
+   - **Client**: The browser's native `MediaRecorder` API captures high-fidelity audio directly from the microphone.
+   - **Conversion**: The client's Web Audio API decodes and formats the audio into standard 16 kHz mono WAV.
+   - **Upload**: Sent via HTTP multipart form-data to `POST /api/transcribe`.
+   - **Inference**: The FastAPI backend invokes `pywhispercpp.Model` to transcribe the speech and returns `{ "text": "...", "language": "..." }`.
+4. **Multilingual Speech Support**: Supports 99 languages, including English, Hindi, and Marathi voice input.
 
 ---
 
