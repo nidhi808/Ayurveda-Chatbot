@@ -128,5 +128,31 @@
     "page": 112,
     "language": "English",
     "year": 2022
+  },
+  {
+    "id": "herb_011",
+    "title": "Shatavari (Indian Asparagus) — Asparagus racemosus",
+    "category": "Herbs",
+    "subcategory": "Dravyaguna",
+    "content": "Shatavari (Asparagus racemosus), hailed in classical Ayurveda as the premier female reproductive rejuvenative (Rasayana) and menstrual cycle tonic (Stri-Rasayana), translates literally to 'she who possesses a hundred protectors'. Traditional attributes: Rasa: Madhura (sweet), Tikta (bitter); Guna: Guru (heavy), Snigdha (unctuous); Virya: Sheeta (cooling); Vipaka: Madhura (sweet); Dosha effect: Pacifies Vata and Pitta doshas. Parts used: Roots and tuberous root extracts. Traditional uses: Artavajanana (nourishes and balances the female period cycle), Stanya (promotes healthy lactation), Balya (restores stamina), and soothing to Apana Vayu. It eases menstrual cramps by relaxing uterine spasms, relieves premenstrual syndrome (PMS) mood fluctuations, and balances ovarian and hormonal tissues (Artavavaha Srotas). Modern Scientific Observations: Rich in steroidal saponins (shatavarins I-IV), isoflavones, and polyphenols exhibiting estrogen-modulating, adaptogenic, anti-inflammatory, and uterine-tonic actions.",
+    "source": "Ayurvedic Pharmacopoeia of India (API) Part I, Vol IV",
+    "source_url": "https://ayush.gov.in",
+    "section": "Monograph 58: Satavari (Asparagus racemosus)",
+    "page": 108,
+    "language": "English",
+    "year": 2022
+  },
+  {
+    "id": "herb_012",
+    "title": "Ashoka (Sacred Asoka) — Saraca asoca",
+    "category": "Herbs",
+    "subcategory": "Dravyaguna",
+    "content": "Ashoka (Saraca asoca / Saraca indica), whose name literally translates to 'sorrow-less', is one of the most celebrated uterine and gynecological tonics in classical Ayurvedic pharmacology. Traditional attributes: Rasa: Kashaya (astringent), Tikta (bitter); Guna: Laghu (light), Ruksha (dry); Virya: Sheeta (cooling); Vipaka: Katu (pungent); Dosha effect: Balances Pitta and Kapha, pacifies Rakta (blood) disorders. Parts used: Dried stem bark. Traditional uses: Stri-roga-hara (reliever of female gynecological and menstrual ailments), Artava-shamana (regulates heavy menstrual bleeding, menorrhagia, and irregular cycles), and Vedanasthapana (eases uterine pain and menstrual spasms). The classical formulation Ashokarishta is widely utilized in traditional wellness for uterine tone and cycle regularity. Modern Scientific Observations: Bark extracts contain proanthocyanidins, tannins, ketosteroids, and flavonoids that demonstrate strong uterine muscle-regulating and hemostatic activities.",
+    "source": "Ayurvedic Pharmacopoeia of India (API) Part I, Vol I",
+    "source_url": "https://ayush.gov.in",
+    "section": "Monograph 10: Ashoka (Saraca asoca)",
+    "page": 23,
+    "language": "English",
+    "year": 2022
   }
 ]

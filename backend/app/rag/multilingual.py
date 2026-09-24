@@ -92,6 +92,27 @@ AYURVEDA_GLOSSARY: Dict[str, List[str]] = {
     "gulvel": ["guduchi", "giloy", "tinospora cordifolia"],
     "kadulimb": ["neem", "nimba", "azadirachta indica"],
 
+    # Women's Menstrual Health, Period Cycle & Gynecology
+    "period": ["period", "menstrual", "menstruation", "artava", "rajaswala paricharya", "apana vayu", "shatavari", "ashoka", "cycle"],
+    "periods": ["period", "menstrual", "menstruation", "artava", "rajaswala paricharya", "apana vayu", "shatavari", "ashoka", "cycle"],
+    "menstrual": ["menstrual", "menstruation", "artava", "rajaswala paricharya", "apana vayu", "shatavari", "ashoka", "cycle", "cramps"],
+    "menstruation": ["menstruation", "artava", "rajaswala paricharya", "apana vayu", "shatavari", "ashoka", "menstrual cycle"],
+    "menses": ["menses", "artava", "rajaswala paricharya", "apana vayu", "shatavari", "ashoka"],
+    "cramps": ["menstrual cramps", "kashtartava", "dysmenorrhea", "apana vayu", "shatavari", "ashoka", "jeera", "ajwain"],
+    "pms": ["pms", "premenstrual", "artava", "shatavari", "pitta", "vata"],
+    "shatavari": ["shatavari", "asparagus racemosus", "stri rasayana", "artava", "stanya"],
+    "ashoka": ["ashoka", "saraca asoca", "uterine tonic", "artava", "ashokarishta", "menstrual"],
+    "मासिक पाळी": ["period", "menstrual", "artava", "rajaswala paricharya", "shatavari", "ashoka", "apana vayu"],
+    "मासिक धर्म": ["period", "menstrual", "artava", "rajaswala paricharya", "shatavari", "ashoka", "apana vayu"],
+    "मासिक": ["period", "menstrual", "artava", "rajaswala paricharya", "shatavari", "ashoka"],
+    "पीरियड्स": ["period", "menstrual", "artava", "rajaswala paricharya", "shatavari", "ashoka", "apana vayu"],
+    "पीरियड": ["period", "menstrual", "artava", "rajaswala paricharya", "shatavari", "ashoka", "apana vayu"],
+    "माहवारी": ["period", "menstrual", "artava", "rajaswala paricharya", "shatavari", "ashoka", "apana vayu"],
+    "कष्टार्तव": ["menstrual cramps", "kashtartava", "dysmenorrhea", "rajaswala paricharya", "apana vayu", "shatavari", "ashoka"],
+    "पाळी": ["period", "menstrual", "artava", "rajaswala paricharya", "shatavari", "ashoka"],
+    "शतावरी": ["shatavari", "asparagus racemosus", "artava", "stanya", "rasayana"],
+    "अशोक": ["ashoka", "saraca asoca", "uterine tonic", "artava"],
+
     # Hindi Devanagari & Classical terms
     "त्रिदोष": ["tridosha", "three doshas", "doshas"],
     "वात": ["vata", "vayu", "wind"],

@@ -180,11 +180,14 @@ Please provide an educational, clear, and grounded explanation based strictly on
         is_cough_query = any(w in q_lower or w in query for w in [
             "khokla", "khoklya", "खोकला", "खोकल्या", "कास", "cough", "kasa", "घसा", "sardi", "सर्दी"
         ])
+        is_period_query = any(w in q_lower or w in query for w in [
+            "period", "periods", "menstrual", "menstruation", "मासिक", "पाळी", "मासिक पाळी", "मासिक धर्म", "shatavari", "शतावरी", "ashoka", "अशोक", "cramp", "cramps"
+        ]) or any(kw in primary.title.lower() for kw in ["rajaswala", "shatavari", "ashoka"])
 
         if language == "mr":
-            return self._synthesize_marathi_response(query, citations, is_cough_query)
+            return self._synthesize_marathi_response(query, citations, is_cough_query, is_period_query)
         elif language == "hi":
-            return self._synthesize_hindi_response(query, citations, is_cough_query)
+            return self._synthesize_hindi_response(query, citations, is_cough_query, is_period_query)
 
         # English Default
         response_parts = []
@@ -192,12 +195,16 @@ Please provide an educational, clear, and grounded explanation based strictly on
         content = primary.content or primary.snippet or ""
         response_parts.append(f"{content}\n")
 
-        # Check if any secondary citations were explicitly queried (e.g. comparing Ritucharya and Dinacharya)
+        # Check if any secondary citations were explicitly queried or related to period care
         matching_secondary = []
         if len(citations) > 1:
             for c in citations[1:]:
                 title_words = [w.lower() for w in re.findall(r'[a-zA-Z]{4,}', c.title)]
-                if any(w in q_lower for w in title_words):
+                is_match = any(w in q_lower for w in title_words)
+                if not is_match and is_period_query:
+                    if any(kw in c.title.lower() for kw in ["shatavari", "ashoka", "rajaswala"]):
+                        is_match = True
+                if is_match:
                     matching_secondary.append(c)
 
         if matching_secondary:
@@ -226,7 +233,8 @@ Please provide an educational, clear, and grounded explanation based strictly on
         self,
         query: str,
         citations: List[SourceCitation],
-        is_cough_query: bool
+        is_cough_query: bool,
+        is_period_query: bool = False
     ) -> str:
         """Synthesizes structured, authentic Ayurvedic guidance in Marathi."""
         marathi_title_map = {
@@ -246,7 +254,10 @@ Please provide an educational, clear, and grounded explanation based strictly on
             "Prakriti and Vikriti — Individual Constitution and Doshic Imbalance": "प्रकृती आणि विकृती — शारीरिक प्रकृती व दोषांचे असंतुलन",
             "Dinacharya — Classical Daily Regimen for Optimal Health": "दिनचर्या — आरोग्यासाठी आदर्श दैनंदिन जीवनशैली नियम",
             "Ritucharya — Seasonal Regimen and Doshic Rhythms": "ऋतुचर्या — ऋतूनुसार आहाराचे व जीवनशैलीचे नियम",
-            "Ahara — Ayurvedic Dietary Principles and the Six Tastes (Shad Rasa)": "आहार — षड्रस आणि आयुर्वेदाचे पोषण नियम"
+            "Ahara — Ayurvedic Dietary Principles and the Six Tastes (Shad Rasa)": "आहार — षड्रस आणि आयुर्वेदाचे पोषण नियम",
+            "Rajaswala Paricharya — Ayurvedic Menstrual Cycle Care & Female Wellness": "रजस्वला परिचर्या — मासिक पाळीतील आरोग्य व महिला कल्याण",
+            "Shatavari (Indian Asparagus) — Asparagus racemosus": "शतावरी — Asparagus racemosus (स्त्री रसायन)",
+            "Ashoka (Sacred Asoka) — Saraca asoca": "अशोक — Saraca asoca (गर्भाशय टॉनिक)"
         }
 
         primary = citations[0]
@@ -268,6 +279,22 @@ Please provide an educational, clear, and grounded explanation based strictly on
                 "• **सितोपलादि चूर्ण (Sitopaladi Churna)**: हे खोकला, सर्दी आणि कफासाठीचे शास्त्रीय चूर्ण आहे. हे चूर्ण मध आणि साजूक तुपासोबत चाटण करून घेतले जाते.\n"
                 "• **सुंठ आणि कोमट पाणी**: सुंठ पावडर मधात मिसळून किंवा कोमट पाण्यातून घेतल्याने कफ वितळण्यास आणि पचन सुधारण्यास मदत होते.\n"
                 "• **हळदीचे दूध व वाफ**: रात्री झोपताना कोमट दुधात चिमूटभर हळद टाकून पिणे आणि ओवा किंवा निलगिरी तेलाची वाफ घेणे श्वसनमार्ग मोकळा करते."
+            )
+        elif is_period_query or "rajaswala" in primary.title.lower() or "shatavari" in primary.title.lower() or "ashoka" in primary.title.lower():
+            response_parts.append(
+                "आयुर्वेदात मासिक पाळी ही शरीराचे नैसर्गिक शुद्धीकरण मानले जाते. ही प्रक्रिया मुख्यत्वे **अपान वायू** (Apana Vayu - अधोगामी गती नियंत्रित करणारा वात) "
+                "आणि **आर्तव धातू** (Artava Dhatu) यांच्या संतुलनावर अवलंबून असते. निरोगी व वेदनाविरहित मासिक पाळीसाठी चरक व सुश्रुत संहितेत **'रजस्वला परिचर्या'** "
+                "नावाचे अत्यंत प्रभावी शास्त्रीय जीवनशैली व आहार नियम सांगितले आहेत."
+            )
+            response_parts.append(
+                "#### मासिक पाळीतील आरोग्य व त्रासावर शास्त्रीय आयुर्वेदिक उपाय:\n"
+                "• **रजस्वला परिचर्या (विश्रांती)**: पहिल्या २-३ दिवसांत शारीरिक आणि मानसिक विश्रांती घेणे आवश्यक आहे. अतिश्रम, प्रवास किंवा तणावामुळे अपान वायू विचलित (प्रतीलोम) होतो आणि पोटात कळा (काष्टार्तव) येतात.\n"
+                "• **सुपाच्य व कोमट आहार**: मुगाची मऊ खिचडी, साजूक तूप लावलेला कोमट भात आणि पाचक सूप घ्यावे. थंड पेये, बर्फ, आंबट-तिखट व तळलेले पदार्थ टाळावेत.\n"
+                "• **कळा व पोटदुखीवर घरगुती काढा**: जिरं, बडीशेप, सुंठ आणि ओवा समप्रमाणात कोमट पाण्यात उकळून तयार केलेला चहा/काढा गर्भाशयाच्या स्नायूंना शिथिल करतो आणि कळा शांत करतो.\n"
+                "• **ओटीपोटावर शेक**: ओटीपोटावर आणि कमरेवर कोमट तिळाच्या तेलाने हलका मसाज करणे किंवा गरम पाण्याच्या पिशवीने शेक घेणे.\n"
+                "• **प्रमुख स्त्री संजीवनी औषधी वनस्पती**:\n"
+                "  - **शतावरी (Shatavari)**: स्त्री संप्रेरके (Hormonal balance) संतुलित ठेवणारी आणि अपान वायूचे पोषण करणारी सर्वश्रेष्ठ रसायन वनस्पती.\n"
+                "  - **अशोक (Ashoka / Ashokarishta)**: गर्भाशयाचे आरोग्य व मासिक पाळीचे नियमन करण्यासाठी शास्त्रीय औषधी."
             )
         else:
             # General grounded synthesis in Marathi
@@ -297,7 +324,8 @@ Please provide an educational, clear, and grounded explanation based strictly on
         self,
         query: str,
         citations: List[SourceCitation],
-        is_cough_query: bool
+        is_cough_query: bool,
+        is_period_query: bool = False
     ) -> str:
         """Synthesizes structured Ayurvedic guidance in Hindi."""
         primary = citations[0]
@@ -315,6 +343,21 @@ Please provide an educational, clear, and grounded explanation based strictly on
                 "• **मुलेठी (यष्टिमधु)**: सूखी खांसी और गले की खराश के लिए मुलेठी चबाना या इसका चूर्ण गुनगुने पानी के साथ लेना लाभकारी है।\n"
                 "• **सितोपलादि चूर्ण**: यह खांसी और जुकाम के लिए एक प्रसिद्ध शास्त्रीय औषधि है जिसे शहद और घी के साथ लिया जाता है।\n"
                 "• **सोंठ और गुड़**: सोंठ का सेवन कफ को संतुलित करता है और श्वसन तंत्र को गर्माहट देता है।"
+            )
+        elif is_period_query or "rajaswala" in primary.title.lower() or "shatavari" in primary.title.lower() or "ashoka" in primary.title.lower():
+            response_parts.append(
+                "आयुर्वेद में मासिक धर्म को एक अत्यंत महत्वपूर्ण प्राकृतिक शोधन प्रक्रिया माना गया है, जो मुख्य रूप से **अपान वायु** और **आर्तव धातु** के संतुलन से संचालित होती है। "
+                "मासिक धर्म को सुखद, नियमित और दर्द-मुक्त रखने के लिए चरक एवं सुश्रुत संहिता में **'रजस्वला परिचर्या'** का विशेष विधान दिया गया है।"
+            )
+            response_parts.append(
+                "#### मासिक धर्म (पीरियड्स) के लिए प्रमुख आयुर्वेदिक नियम व उपाय:\n"
+                "• **रजस्वला परिचर्या (पर्याप्त विश्राम)**: पहले 2-3 दिनों में भारी शारीरिक व्यायाम, लंबी यात्रा और अत्यधिक मानसिक तनाव से बचें, ताकि अपान वायु ऊर्ध्वगामी (प्रतीलोम) न हो और ऐंठन (कष्टार्तव) से बचाव हो।\n"
+                "• **सुपाच्य एवं गुनगुना आहार**: ताजा, हल्का और गर्म भोजन लें, जैसे मूंग दाल की मूँग खिचड़ी, थोड़ा सा देसी घी, और गर्म सब्जियों का सूप। अत्यधिक ठंडे पेय, बर्फ, कच्चा सलाद और तीखे-तले खाद्य पदार्थों से परहेज करें।\n"
+                "• **ऐंठन व दर्द के लिए घरेलू हर्बल चाय**: जीरा, सौंफ, सोंठ और अजवाइन को पानी में उबालकर गुनगुना पीने से गर्भाशय की मांसपेशियां शिथिल होती हैं और दर्द में आराम मिलता है।\n"
+                "• **सेंक एवं तेल मालिश**: पेट के निचले हिस्से और कमर पर गुनगुने तिल के तेल से हल्की मालिश करें या गर्म पानी की थैली से हल्का सेंक लें।\n"
+                "• **प्रमुख आयुर्वेदिक औषधियाँ**:\n"
+                "  - **शतावरी (Shatavari)**: महिलाओं के हार्मोनल संतुलन, गर्भाशय स्वास्थ्य और अपान वायु के पोषण के लिए सर्वश्रेष्ठ रसायन।\n"
+                "  - **अशोक (Ashoka / अशोकारिष्ट)**: गर्भाशय को बल प्रदान करने और मासिक चक्र को नियमित रखने वाली प्रसिद्ध शास्त्रीय औषधि।"
             )
         else:
             response_parts.append(f"**आयुर्वेदिक विवरण**: {primary.content or primary.snippet or ''}")

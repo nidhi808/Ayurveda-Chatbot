@@ -23,6 +23,12 @@ class HybridRetriever:
         vector_results = vector_store.search(query, top_k=candidate_k, category=None)
         bm25_results = bm25_retriever.search(query, top_k=candidate_k, category=None)
 
+        # Relevance guardrail: if query has 0 BM25 match and weak vector similarity, return empty
+        max_bm25 = max([item.get("score", 0) for item in bm25_results], default=0.0)
+        max_vector = max([item.get("score", 0) for item in vector_results], default=0.0)
+        if max_bm25 == 0.0 and max_vector < 0.36:
+            return []
+
         # Reciprocal Rank Fusion (RRF) with balanced weights & category prioritization boost
         doc_scores: Dict[str, float] = {}
         doc_map: Dict[str, Dict[str, Any]] = {}

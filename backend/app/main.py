@@ -52,11 +52,25 @@ app.add_middleware(
 # In-memory feedback store
 feedbacks_db: List[Dict[str, Any]] = []
 
+from backend.app.config import CORS_ORIGINS, GEMINI_MODEL, GEMINI_API_KEY, CORPUS_DIR
+
 @app.on_event("startup")
 def startup_event():
-    """Ensure vector store and BM25 index are loaded on startup."""
-    if len(vector_store.chunks) == 0:
-        print("[Startup] Loading and indexing Ayurveda corpus...")
+    """Ensure vector store and BM25 index are loaded and synchronized on startup."""
+    corpus_files = list(CORPUS_DIR.glob("*.json"))
+    corpus_chunks_count = 0
+    import json
+    for fpath in corpus_files:
+        try:
+            with open(fpath, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if isinstance(data, list):
+                    corpus_chunks_count += len(data)
+        except Exception:
+            pass
+
+    if len(vector_store.chunks) != corpus_chunks_count or len(vector_store.chunks) == 0:
+        print(f"[Startup] Corpus sync needed ({corpus_chunks_count} corpus chunks vs {len(vector_store.chunks)} in index). Re-indexing...")
         load_and_index_corpus()
     else:
         print(f"[Startup] Knowledge base ready with {len(vector_store.chunks)} document chunks.")
@@ -314,6 +328,12 @@ def _generate_followup_suggestions(query: str, citations: List[SourceCitation], 
                 "खोकल्यासाठी ज्येष्ठमधाचे (Yashtimadhu) काय फायदे आहेत?",
                 "कोरडा खोकला आणि कफयुक्त खोकला यावर कोणते आयुर्वेदिक उपाय आहेत?"
             ]
+        elif any(w in q_lower or w in query for w in ["period", "menstrual", "मासिक", "पाळी", "मासिक पाळी", "shatavari", "शतावरी", "अशोक"]):
+            return [
+                "रजस्वला परिचर्येमध्ये कोणता आहार व जीवनशैली पाळावी?",
+                "मासिक पाळीतील त्रासात शतावरीचे काय महत्त्व आहे?",
+                "कळा आणि पोटदुखी कमी करण्यासाठी कोणते घरगुती आयुर्वेदिक काढे उपयुक्त ठरतात?"
+            ]
         elif any(w in q_lower or w in query for w in ["दोष", "वात", "पित्त", "कफ", "dosha", "tridosha"]):
             return [
                 "वात आणि पित्त दोषांमध्ये काय फरक आहे?",
@@ -346,6 +366,12 @@ def _generate_followup_suggestions(query: str, citations: List[SourceCitation], 
                 "मुलेठी (यष्टिमधु) के खांसी में क्या लाभ हैं?",
                 "कफ को संतुलित करने के प्रमुख आयुर्वेदिक उपाय क्या हैं?"
             ]
+        elif any(w in q_lower or w in query for w in ["period", "menstrual", "मासिक", "माहवारी", "मासिक धर्म", "shatavari", "शतावरी", "अशोक"]):
+            return [
+                "रजस्वला परिचर्या के मुख्य आहार एवं जीवनशैली नियम क्या हैं?",
+                "महिलाओं के स्वास्थ्य और मासिक धर्म में शतावरी के क्या लाभ हैं?",
+                "पीरियड्स में पेट दर्द और ऐंठन के लिए कौन से घरेलू हर्बल काढ़े उपयोगी हैं?"
+            ]
         elif "दोष" in query or "वात" in query or "पित्त" in query or "कफ" in query:
             return [
                 "वात और पित्त में क्या अंतर है?",
@@ -371,7 +397,13 @@ def _generate_followup_suggestions(query: str, citations: List[SourceCitation], 
                 "सप्त धातुएँ कौन-कौन सी हैं?"
             ]
 
-    if "dosha" in q_lower or "vata" in q_lower or "pitta" in q_lower or "kapha" in q_lower:
+    if any(w in q_lower for w in ["period", "periods", "menstrual", "menstruation", "cramp", "cramps", "shatavari", "ashoka"]):
+        return [
+            "What is Rajaswala Paricharya and why is rest emphasized during menstruation?",
+            "What are the classical benefits of Shatavari for female reproductive wellness?",
+            "Which carminative herbal teas help relieve pelvic spasms and cramps?"
+        ]
+    elif "dosha" in q_lower or "vata" in q_lower or "pitta" in q_lower or "kapha" in q_lower:
         return [
             "What is the difference between Vata and Pitta?",
             "How does Prakriti relate to Tridosha?",
