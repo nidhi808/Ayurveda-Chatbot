@@ -1,13 +1,13 @@
 # 🌿 AyurBot — AI-Powered Ayurveda Knowledge Assistant
 
-> **Educational RAG Knowledge System for Authentic Classical Ayurveda with Dual-Layer Safety Guardrails, Hybrid Vector-BM25 Retrieval, Local Whisper.cpp Voice Input, and Multilingual Support (मराठी, हिन्दी, संस्कृतम्, English).**
+> **Educational RAG Knowledge System for Authentic Classical Ayurveda with Dual-Layer Safety Guardrails, Hybrid Vector-BM25 Retrieval, Dual-Engine Voice Input (Google Gemini Multimodal STT + On-Device Whisper.cpp), and Multilingual Support (मराठी, हिन्दी, संस्कृतम्, English).**
 
 [![Python Version](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110%2B-009688.svg)](https://fastapi.tiangolo.com/)
 [![React](https://img.shields.io/badge/React-18-61DAFB.svg)](https://react.dev/)
 [![Vite](https://img.shields.io/badge/Vite-5.0%2B-646CFF.svg)](https://vitejs.dev/)
-[![Whisper.cpp](https://img.shields.io/badge/Speech-Whisper.cpp-orange.svg)](https://github.com/ggerganov/whisper.cpp)
-[![Google Gemini](https://img.shields.io/badge/LLM-Gemini%202.5%20Flash-4285F4.svg)](https://ai.google.dev/)
+[![Voice Input](https://img.shields.io/badge/Voice%20STT-Gemini%20%2B%20Whisper.cpp-orange.svg)](https://ai.google.dev/)
+[![Google Gemini](https://img.shields.io/badge/LLM-Gemini%203.1%20%2F%202.5%20Flash%20Lite-4285F4.svg)](https://ai.google.dev/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 ---
@@ -19,7 +19,7 @@
 4. [User Flow Diagram](#-user-flow-diagram)
 5. [Visual Showcase & Screenshots](#-visual-showcase--screenshots)
 6. [Key Features](#-key-features)
-7. [100% Offline Speech-to-Text (Whisper.cpp)](#-100-offline-speech-to-text-whispercpp)
+7. [Dual-Engine Speech Recognition (Gemini AI + Whisper.cpp)](#-dual-engine-speech-recognition-gemini-ai--whispercpp)
 8. [Technology Stack](#-technology-stack)
 9. [Project Structure](#-project-structure)
 10. [Installation & Setup](#-installation--setup)
@@ -43,13 +43,16 @@
 AyurBot addresses these challenges through an end-to-end **Retrieval-Augmented Generation (RAG)** pipeline designed specifically for traditional medicine:
 
 - **Curated Authentic Knowledge Corpus**: Grounded strictly in peer-reviewed reference monographs from the **Ministry of AYUSH**, the **Ayurvedic Pharmacopoeia of India (API)**, and classical Samhitas across 6 domain categories (*Herbs, Fundamentals, Doshas, Lifestyle, Classical Texts, Traditional Concepts*).
-- **Hybrid Fusion Retrieval (BM25 + Dense Vectors with RRF)**: Combines exact keyword matching (BM25) with semantic embeddings (Dense Vector Search) through **Reciprocal Rank Fusion (RRF)**, ensuring both precise terminology hits and conceptual comprehension.
+- **Hybrid Fusion Retrieval (BM25 + Dense Vectors with RRF)**: Combines exact keyword matching (BM25) with semantic embeddings (Dense Vector Search) through **Reciprocal Rank Fusion (RRF)**, supporting Google Gemini 3072d embeddings (`gemini-embedding-001`) with local dense vector fallback.
 - **Multilingual Query Expansion**: A comprehensive phonetic and Devanagari glossary automatically detects regional dialects (Marathi, Hindi, Sanskrit) and expands queries like `"khokla sathi aushadh"` into canonical Ayurvedic and botanical descriptors (*kasa, cough, respiratory, tulsi, yashtimadhu, sitopaladi, kapha*).
 - **Dual-Layer Medical Safety Guardrails**:
   - *Layer 1 (Input Guardrail)*: Real-time regex and semantic classifier detecting acute medical emergencies and pharmaceutical prescription requests, immediately redirecting to professional care.
   - *Layer 2 (Output Guardrail)*: Post-generation validator verifying grounding, stripping unverified dosage claims, and enforcing mandatory educational disclaimers.
-- **Local Voice Transcription (Whisper.cpp)**: Fast, private, on-device audio speech-to-text powered by C++ bindings (`pywhispercpp`), enabling voice questions in 99 languages.
-- **Dual Operating Modes (Online + Offline)**: Works online with Google Gemini 2.5 Flash, or completely offline with built-in grounded knowledge synthesis and translation.
+- **Dual-Engine Speech Recognition (Gemini AI + Whisper.cpp)**:
+  - **Primary**: Google Gemini Multimodal Audio Transcription (`gemini-3.1-flash-lite` ➔ `gemini-2.5-flash-lite`) offering high-accuracy recognition for Indian English, Hindi, Marathi, and Sanskrit, preserving Ayurvedic botanical names (*Ashwagandha, Tulsi, Shatavari, Giloy, Triphala*) verbatim without hallucination.
+  - **Fallback**: On-device C++ inference via `pywhispercpp` (`ggml-tiny.bin`) for complete offline edge processing.
+  - **Audio Processing**: Polyphase sinc anti-aliased resampling using the Web Audio API's native `OfflineAudioContext`.
+- **Resilient Multi-Model Generation**: Google Gemini 3.1 Flash Lite with seamless failover to Gemini 2.5 Flash Lite, protected by offline classical synthesis and React ErrorBoundary.
 
 ---
 
@@ -58,7 +61,9 @@ AyurBot addresses these challenges through an end-to-end **Retrieval-Augmented G
 ```mermaid
 flowchart TB
     subgraph Frontend["🖥️ Client Layer (React 18 + Vite)"]
-        UI[Chat Interface & Voice Input]
+        UI[Chat Interface & Real-Time Audio Dock]
+        WebSpeech[Browser Live Preview SpeechRecognition]
+        AudioCtx[OfflineAudioContext Polyphase Sinc Resampler]
         LangSelect[Language Selector - Marathi, Hindi, English, Sanskrit]
         CatBar[Category Filters - Herbs, Doshas, Lifestyle, etc.]
         Modals[Knowledge Explorer & RAG Evaluator]
@@ -74,19 +79,20 @@ flowchart TB
         L2Safety["Layer 2: Output Validator & Legal Disclaimer Injection"]
     end
 
-    subgraph SpeechEngine["🎙️ Local Speech-to-Text (100% Offline)"]
-        WhisperCpp["pywhispercpp (whisper.cpp tiny model on CPU)"]
+    subgraph SpeechEngine["🎙️ Dual-Engine Speech-to-Text"]
+        GeminiSTT["Google Gemini Multimodal STT (gemini-3.1-flash-lite)"]
+        WhisperCpp["Local pywhispercpp (whisper.cpp tiny CPU model)"]
     end
 
     subgraph RAG["🔍 Hybrid Retrieval Engine"]
         QExp["Multilingual Query Expansion Engine"]
         BM25["BM25 Keyword Retriever"]
-        Vector["Dense Vector Store (Cosine Similarity)"]
+        Vector["Dense Vector Store (Gemini 3072d + Local Cosine)"]
         RRF["Reciprocal Rank Fusion (RRF Weighted Re-ranking)"]
     end
 
     subgraph Generation["🧠 Generation Layer"]
-        Gemini["Google Gemini 2.5 Flash API (Online)"]
+        GeminiLLM["Google Gemini 3.1 / 2.5 Flash Lite API"]
         OfflineSynth["Grounded Multilingual Synthesizer (Offline Fallback)"]
     end
 
@@ -96,8 +102,11 @@ flowchart TB
         Life["Dinacharya, Ritucharya & Tridosha Principles"]
     end
 
-    UI -->|Voice Audio Stream WAV| WhisperCpp
-    WhisperCpp -->|Offline Transcribed Text| UI
+    UI -->|Mic MediaRecorder WebM Stream| AudioCtx
+    AudioCtx -->|16kHz High-Fidelity WAV| Router
+    Router -->|POST /api/transcribe| GeminiSTT
+    GeminiSTT -.->|Failover| WhisperCpp
+    GeminiSTT -->|Verbatim Spoken Words| UI
     UI -->|HTTP Request with Language & Category| Router
     Router --> Memory
     Router --> L1Safety
@@ -111,9 +120,9 @@ flowchart TB
     Vector --> RRF
     RRF -->|Top Grounded Citations| Generation
     Memory -->|Conversation Context| Generation
-    Generation --> Gemini
+    Generation --> GeminiLLM
     Generation --> OfflineSynth
-    Gemini --> L2Safety
+    GeminiLLM --> L2Safety
     OfflineSynth --> L2Safety
     L2Safety -->|Structured Response + Verified Sources| Router
     Router -->|JSON Response| UI
@@ -128,19 +137,29 @@ sequenceDiagram
     autonumber
     actor User as User / Practitioner
     participant UI as React Web Interface
+    participant AudioEngine as Web Audio (OfflineAudioContext)
     participant Backend as FastAPI Backend
+    participant GeminiSTT as 🎙️ Gemini 3.1 Multimodal STT
     participant WhisperCpp as 🎙️ Local Whisper.cpp (Offline CPU)
     participant Safety as Safety Guardrails
     participant RAG as Hybrid Retriever (Vector+BM25)
-    participant Generator as LLM / Grounded Synthesizer
+    participant Generator as LLM (Gemini 3.1 / 2.5 Flash Lite)
 
-    User->>UI: Selects Language (e.g., Marathi) & enters query
-    opt Voice Input (100% Offline On-Device)
-        User->>UI: Clicks Microphone & Speaks
-        UI->>Backend: POST /api/transcribe (Audio WAV)
-        Backend->>WhisperCpp: Local CPU Inference via pywhispercpp (ggml-tiny)
-        WhisperCpp-->>Backend: Transcribed text (0 external network calls)
-        Backend-->>UI: Transcribed text
+    User->>UI: Selects Language & Enters Query
+    opt Voice Input (Dual-Engine with Live Feedback)
+        User->>UI: Clicks Microphone & Speaks Query
+        UI-->>User: Live visual indicator (timer, waveform, Web Speech interim typing)
+        User->>UI: Clicks "Done Speaking"
+        UI->>AudioEngine: Polyphase sinc anti-aliasing resample to 16kHz WAV
+        AudioEngine->>Backend: POST /api/transcribe (16kHz WAV)
+        alt Gemini Cloud Available
+            Backend->>GeminiSTT: Multimodal audio transcription (preserves herb names verbatim)
+            GeminiSTT-->>Backend: Accurate transcribed text (e.g., "Ashwagandha")
+        else Offline / Local Mode
+            Backend->>WhisperCpp: Local CPU inference via pywhispercpp
+            WhisperCpp-->>Backend: Offline transcribed text
+        end
+        Backend-->>UI: Authoritative transcription populates chat input
     end
     UI->>Backend: POST /api/chat { message, language, category }
     Backend->>Safety: Layer 1: Evaluate Input Safety
@@ -194,33 +213,61 @@ Built-in evaluation modal running 19 standard clinical and classical test querie
 - **Source Verification & Citations**: Every assistant reply cites authentic monographs with direct links to the official AYUSH portal.
 - **Interactive Knowledge Corpus Explorer**: Search and filter all indexed documents across categories (*Herbs, Doshas, Fundamentals, Lifestyle, Classical Texts*).
 - **RAG Evaluation Benchmark Dashboard**: In-app evaluation suite testing **Precision@3**, **Safety Detection Accuracy**, and **Groundedness Score** against standard Ayurvedic test queries.
-- **100% Offline Voice Transcription (Whisper.cpp)**: Fast, private, on-device audio speech-to-text without external audio API fees or cloud dependencies.
+- **Dual-Engine Speech Recognition**: High-accuracy Google Gemini Multimodal STT for botanical terminology + on-device Whisper.cpp for 100% offline edge resilience.
 - **Category-Scoped Inquiries**: Filter conversations specifically for *Herbs*, *Doshas*, *Fundamentals*, or *Lifestyle Regimens*.
 - **Dynamic Follow-up Recommendations**: Generates logical next questions in the active conversation language.
 
 ---
 
-## 🎙️ 100% Offline Speech-to-Text (Whisper.cpp)
+## 🎙️ Dual-Engine Speech Recognition (Gemini AI + Whisper.cpp)
 
-AyurBot implements a **fully offline, on-device voice recognition pipeline** using high-performance C++ bindings via `pywhispercpp`.
+AyurBot implements a resilient, hybrid voice recognition architecture engineered specifically for the phonetic complexities of Indian languages and Ayurvedic botanical nomenclature.
 
-### 🔒 Why 100% Offline Matters
-- **Zero Cloud Latency & Zero API Costs**: Voice transcription does not make calls to OpenAI, Google Cloud Speech, or third-party servers. It is free forever, instant, and incurs no per-minute billing.
-- **Complete Health Privacy**: In medical and wellness contexts, audio recordings containing personal symptoms and conditions never leave the user's local machine.
-- **Rural & Low-Bandwidth Resilience**: Operates reliably in remote Ayurvedic clinics, rural health centers, and dispensaries with zero or intermittent internet access.
+```
+                  ┌───────────────────────────────────────────────┐
+                  │ 🎙️ User Speaks (English / Hindi / Marathi)    │
+                  └───────────────────────┬───────────────────────┘
+                                          │
+                                          ▼
+                  ┌───────────────────────────────────────────────┐
+                  │ 🎧 Web Audio API (OfflineAudioContext)        │
+                  │    • Sinc Polyphase Resampling (48kHz ➔ 16kHz)│
+                  │    • Complete Anti-Aliasing & Low-Pass Filter │
+                  └───────────────────────┬───────────────────────┘
+                                          │
+                                          ▼
+                  ┌───────────────────────────────────────────────┐
+                  │ 🚀 FastAPI Server (/api/transcribe)           │
+                  └───────┬───────────────────────────────┬───────┘
+                          │                               │
+                Online (Gemini Key)               Offline / Local
+                          │                               │
+                          ▼                               ▼
+      ┌──────────────────────────────────────┐  ┌─────────────────────────────────┐
+      │ 🧠 Google Gemini Multimodal STT      │  │ ⚡ On-Device Whisper.cpp (CPU)   │
+      │    • gemini-3.1-flash-lite (primary) │  │    • pywhispercpp C++ bindings  │
+      │    • gemini-2.5-flash-lite (failover)│  │    • ggml-tiny.bin (~74 MB)     │
+      │    • Verbatim Ayurvedic Botanical STT│  │    • 100% Offline, Zero Cloud   │
+      └──────────────────────────────────────┘  └─────────────────────────────────┘
+```
 
-### ⚙️ Technical Implementation Details
-1. **Model Weights**: Utilizes the quantized **GGML Tiny model** (`ggml-tiny.bin`, ~74.09 MB). The model is stored locally on-disk:
-   ```
-   %LOCALAPPDATA%/pywhispercpp/pywhispercpp/models/ggml-tiny.bin
-   ```
-2. **Multi-Threaded CPU Execution**: Written in pure C/C++ without requiring heavy CUDA or PyTorch installations. It executes across 4 CPU threads simultaneously, processing audio in near real-time (~0.3s latency on standard consumer laptops).
-3. **Audio Capture Pipeline**:
-   - **Client**: The browser's native `MediaRecorder` API captures high-fidelity audio directly from the microphone.
-   - **Conversion**: The client's Web Audio API decodes and formats the audio into standard 16 kHz mono WAV.
-   - **Upload**: Sent via HTTP multipart form-data to `POST /api/transcribe`.
-   - **Inference**: The FastAPI backend invokes `pywhispercpp.Model` to transcribe the speech and returns `{ "text": "...", "language": "..." }`.
-4. **Multilingual Speech Support**: Supports 99 languages, including English, Hindi, and Marathi voice input.
+### 1. Engine 1: Google Gemini Multimodal STT (Primary)
+- **Acoustic Botanical Precision**: General-purpose voice engines frequently confuse specialized Sanskrit or Ayurvedic terms. Gemini's multimodal audio models natively recognize terms like *Ashwagandha, Tulsi, Shatavari, Giloy, Triphala, Haritaki, Brahmi, Vata, Pitta, and Kapha* verbatim.
+- **Unbiased Verbatim Prompting**: Utilizes a strict, non-primed Speech-to-Text instruction preventing topical hallucinations (such as substituting unsaid home remedies), while actively filtering out silence timestamp artifacts (`00:00`).
+- **Multi-Model Cloud Resilience**: Transparent failover chain across `gemini-3.1-flash-lite` and `gemini-2.5-flash-lite` to ensure near-zero downtime.
+
+### 2. Engine 2: Local Whisper.cpp (Offline Edge Fallback)
+- **Zero Cloud Latency & Zero API Costs**: When running completely offline, audio is processed locally on CPU via C++ bindings (`pywhispercpp`) with the quantized `ggml-tiny.bin` model (~74.09 MB).
+- **Patient Privacy**: Sensitive health queries never leave the practitioner's or patient's workstation.
+- **Remote Dispensary Resilience**: Continues working in rural clinics with intermittent or absent internet connectivity.
+
+### 3. Studio-Grade Client Resampling (`OfflineAudioContext`)
+- Standard browser downsampling using simple point decimation folds frequencies between 8kHz and 24kHz back into the audible band, causing harsh distortion that ruins consonant recognition.
+- AyurBot utilizes the browser's hardware-accelerated **`OfflineAudioContext`**, performing professional polyphase sinc anti-aliasing downsampling to pristine 16 kHz mono WAV before transmission.
+
+### 4. Interactive Live Feedback
+- **Real-Time Visual Dock**: Displays an active recording banner with an elapsed seconds timer `(Xs / 20s)`, pulsing audio indicators, and a dedicated **"Done Speaking"** button.
+- **Authoritative Transcription**: While native browser Web Speech API provides live interim preview typing, the authoritative Gemini AI transcription automatically finalizes the input box upon recording completion.
 
 ---
 
@@ -230,7 +277,9 @@ AyurBot implements a **fully offline, on-device voice recognition pipeline** usi
 - **Framework**: React 18 with Vite
 - **Styling**: Vanilla CSS Design System with CSS variables, responsive flex/grid, and glassmorphic cards
 - **Icons**: Lucide React (`lucide-react`)
-- **Speech API**: Web Audio API + MediaRecorder with fallback to whisper.cpp
+- **Audio Processing**: Web Audio API (`OfflineAudioContext` sinc resampler + `MediaRecorder`)
+- **Speech Preview**: Native Web Speech API (`SpeechRecognition` / `webkitSpeechRecognition`)
+- **Resilience**: React ErrorBoundary component protecting against runtime rendering crashes
 
 ### Backend
 - **Framework**: FastAPI (Python 3.10+)
@@ -238,12 +287,13 @@ AyurBot implements a **fully offline, on-device voice recognition pipeline** usi
 - **Data Validation**: Pydantic v2
 - **Information Retrieval**:
   - Keyword Search: BM25 Okapi (`rank-bm25`)
-  - Vector Embeddings: Custom Cosine Vector Engine with Local Dense N-Gram Hash Vectorizer + Gemini Embeddings (`text-embedding-004`)
+  - Vector Embeddings: Gemini Embeddings (`gemini-embedding-001`, 3072d) + Local Dense N-Gram Hash Vectorizer (128d) with self-healing auto-reindexing
   - Ranking: Reciprocal Rank Fusion (RRF)
-- **Generative AI**:
-  - Google Gemini 2.5 Flash API (`google-genai` & `google-generativeai`)
-  - Grounded Multilingual Synthesis Engine (local fallback)
-- **Audio Processing**:
+- **Generative AI & Multimodal STT**:
+  - Google Gemini 3.1 Flash Lite API (`google-genai` v1.42+)
+  - Google Gemini 2.5 Flash Lite API (automatic cloud failover)
+  - Grounded Multilingual Synthesis Engine (local classical fallback)
+- **Local Audio Processing**:
   - `pywhispercpp` (C++ `whisper.cpp` Python bindings)
   - GGML Tiny model (`ggml-tiny.bin`)
 - **Testing**: Pytest, FastAPI TestClient (`httpx`)
@@ -344,11 +394,11 @@ cd Ayurveda-Chatbot
    Open `.env` and optionally provide your Google Gemini API key:
    ```env
    GEMINI_API_KEY=your_gemini_api_key_here
-   GEMINI_MODEL=gemini-2.5-flash
+   GEMINI_MODEL=gemini-3.1-flash-lite
    HOST=0.0.0.0
    PORT=8000
    ```
-   > 💡 **Note**: If `GEMINI_API_KEY` is omitted, AyurBot automatically runs in **offline grounded synthesis mode** using local embeddings and pre-indexed classical knowledge!
+   > 💡 **Note**: AyurBot includes automatic multi-model failover (`gemini-3.1-flash-lite` ➔ `gemini-2.5-flash-lite`). If `GEMINI_API_KEY` is omitted, AyurBot automatically runs in **offline grounded synthesis mode** using local dense embeddings and pre-indexed classical knowledge!
 
 4. Build the vector & BM25 indices:
    ```bash
