@@ -58,12 +58,24 @@ export default function ChatWindow({
   const messagesEndRef = useRef(null);
   const [isRecording, setIsRecording] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
+  const recognitionRef = useRef(null);
+  const recordingTimerRef = useRef(null);
+  const liveTranscriptRef = useRef("");
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
+
+  useEffect(() => {
+    return () => {
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+      }
+    };
+  }, []);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -79,26 +91,55 @@ export default function ChatWindow({
   };
 
   // -------------------------------------------------------------
-  // Voice Input using whisper.cpp + Web Audio / MediaRecorder
+  // Voice Input: Resilient Dual-Engine (Web Speech API + Backend Gemini/Whisper)
   // -------------------------------------------------------------
+  const stopRecordingSession = () => {
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch (e) {}
+    }
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      try {
+        mediaRecorderRef.current.stop();
+      } catch (e) {}
+    }
+    setIsRecording(false);
+  };
+
   const toggleRecording = async () => {
     if (isRecording) {
-      // Stop recording
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-        mediaRecorderRef.current.stop();
-      }
-      setIsRecording(false);
+      stopRecordingSession();
       return;
     }
+
+    liveTranscriptRef.current = "";
+    setRecordingSeconds(0);
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioChunksRef.current = [];
-      const mediaRecorder = new MediaRecorder(stream);
+
+      let mimeType = "";
+      if (typeof MediaRecorder !== "undefined") {
+        if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) {
+          mimeType = "audio/webm;codecs=opus";
+        } else if (MediaRecorder.isTypeSupported("audio/webm")) {
+          mimeType = "audio/webm";
+        } else if (MediaRecorder.isTypeSupported("audio/ogg;codecs=opus")) {
+          mimeType = "audio/ogg;codecs=opus";
+        }
+      }
+
+      const mediaRecorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
 
       mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
+        if (event.data && event.data.size > 0) {
           audioChunksRef.current.push(event.data);
         }
       };
@@ -107,32 +148,95 @@ export default function ChatWindow({
         stream.getTracks().forEach((track) => track.stop());
         const rawBlob = new Blob(audioChunksRef.current, { type: mediaRecorder.mimeType || "audio/webm" });
 
-        if (rawBlob.size > 500) {
+        // If Web Speech API already transcribed the speech live, keep it
+        if (liveTranscriptRef.current && liveTranscriptRef.current.trim().length > 0) {
+          return;
+        }
+
+        // Otherwise, send recorded audio to Gemini / Whisper backend
+        if (rawBlob.size > 800) {
           setTranscribing(true);
           try {
-            // Convert browser audio into genuine 16kHz 16-bit mono RIFF WAV for whisper.cpp
             const pcmWavBlob = await convertBlobTo16kHzWav(rawBlob);
             const data = await uploadAndTranscribeAudio(pcmWavBlob, selectedLanguage);
             if (data && data.text && data.text.trim()) {
-              setInputText(data.text.trim());
+              setInputText((prev) => {
+                const trimmed = data.text.trim();
+                return prev && !prev.includes(trimmed) ? `${prev} ${trimmed}`.trim() : trimmed;
+              });
             } else if (data && data.error) {
-              alert(`Voice input notice: ${data.error}\nYou can type your query directly in the input box.`);
+              console.warn("[Voice] Backend notice:", data.error);
             } else {
-              alert("No speech was detected. Please try speaking closer to the microphone or type your query.");
+              alert("No clear speech detected. Please speak closer to your microphone or type your question.");
             }
           } catch (err) {
-            console.warn("[Voice] whisper.cpp local transcription error:", err);
-            alert("Voice transcription is unavailable. Please type your query in the input box.");
+            console.error("[Voice] Backend transcription error:", err);
+            alert("Voice transcription could not be completed. You can type your question in the text box.");
           } finally {
             setTranscribing(false);
           }
         }
       };
 
-      mediaRecorder.start();
+      mediaRecorder.start(250);
       setIsRecording(true);
+
+      // Auto-stop after 20 seconds maximum
+      let elapsed = 0;
+      recordingTimerRef.current = setInterval(() => {
+        elapsed += 1;
+        setRecordingSeconds(elapsed);
+        if (elapsed >= 20) {
+          stopRecordingSession();
+        }
+      }, 1000);
+
+      // Concurrently run Web Speech Recognition if supported for live typing preview
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        try {
+          const recognition = new SpeechRecognition();
+          recognitionRef.current = recognition;
+          recognition.continuous = true;
+          recognition.interimResults = true;
+
+          if (selectedLanguage === "mr") {
+            recognition.lang = "mr-IN";
+          } else if (selectedLanguage === "hi") {
+            recognition.lang = "hi-IN";
+          } else {
+            recognition.lang = "en-IN";
+          }
+
+          recognition.onresult = (event) => {
+            let transcript = "";
+            for (let i = 0; i < event.results.length; i++) {
+              transcript += event.results[i][0].transcript;
+            }
+            if (transcript.trim()) {
+              liveTranscriptRef.current = transcript.trim();
+              setInputText(transcript.trim());
+            }
+          };
+
+          recognition.onerror = (event) => {
+            console.warn("[Voice] Web Speech API notice (audio will still be transcribed by Gemini backend):", event.error);
+          };
+
+          recognition.onend = () => {};
+          recognition.start();
+        } catch (err) {
+          console.warn("[Voice] Web Speech API start notice:", err);
+        }
+      }
     } catch (err) {
-      alert("Microphone access could not be granted. Please check browser permissions.");
+      console.error("[Voice] Microphone access error:", err);
+      setIsRecording(false);
+      if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
+        alert("Microphone permission was denied. Please click the lock or settings icon in your browser address bar and enable Microphone access.");
+      } else {
+        alert("Could not access microphone. Please ensure your microphone is connected.");
+      }
     }
   };
 
@@ -196,6 +300,67 @@ export default function ChatWindow({
 
       {/* Floating Input Dock */}
       <div className="input-dock">
+        {(isRecording || transcribing) && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              background: isRecording ? "#fef2f2" : "#f0fdf4",
+              border: `1px solid ${isRecording ? "#fca5a5" : "#86efac"}`,
+              borderRadius: "12px",
+              padding: "8px 16px",
+              marginBottom: "10px",
+              fontSize: "13px",
+              color: isRecording ? "#991b1b" : "#166534",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.06)"
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", fontWeight: "600" }}>
+              {isRecording ? (
+                <>
+                  <span
+                    style={{
+                      display: "inline-block",
+                      width: "10px",
+                      height: "10px",
+                      borderRadius: "50%",
+                      background: "#ef4444"
+                    }}
+                  />
+                  <span>Listening... Speak your question now</span>
+                  <span style={{ opacity: 0.75, fontWeight: "500", fontSize: "12px" }}>
+                    ({recordingSeconds}s / 20s)
+                  </span>
+                </>
+              ) : (
+                <>
+                  <Loader2 size={16} className="animate-spin" color="#166534" />
+                  <span>Transcribing speech with AI...</span>
+                </>
+              )}
+            </div>
+            {isRecording && (
+              <button
+                type="button"
+                onClick={stopRecordingSession}
+                style={{
+                  background: "#ef4444",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: "6px",
+                  padding: "4px 12px",
+                  fontSize: "12px",
+                  fontWeight: "600",
+                  cursor: "pointer"
+                }}
+              >
+                Done Speaking
+              </button>
+            )}
+          </div>
+        )}
+
         <form className="input-box-wrapper" onSubmit={handleSubmit}>
           {selectedCategory && selectedCategory !== "All" && (
             <span
@@ -226,9 +391,11 @@ export default function ChatWindow({
             className="chat-input"
             placeholder={
               transcribing
-                ? "🎙️ Transcribing audio with local whisper.cpp (offline)..."
+                ? "🎙️ Transcribing audio with AI..."
+                : isRecording
+                ? "🔴 Listening to your voice... Speak clearly"
                 : selectedLanguage === "mr"
-                ? "आयुर्वेद, खोकला, वात-पित्त-कफ, दिनचर्या, किंवा औषधी वनस्पतींबद्दल विचारा..."
+                ? "आयुर्वेद, खोकला, वात-पित्त-कफ, किंवा औषधी वनस्पतींबद्दल विचारा..."
                 : selectedLanguage === "hi"
                 ? "आयुर्वेद, वात-पित्त-कफ, दिनचर्या, या जड़ी-बूटियों के बारे में पूछें..."
                 : selectedLanguage === "sa"
@@ -243,7 +410,7 @@ export default function ChatWindow({
             disabled={loading}
           />
 
-          {/* Whisper.cpp Microphone Button */}
+          {/* Voice Input Button */}
           <button
             type="button"
             className={`icon-btn ${isRecording ? "active" : ""}`}
@@ -257,7 +424,7 @@ export default function ChatWindow({
             }}
             onClick={toggleRecording}
             disabled={loading}
-            title={isRecording ? "Stop recording (whisper.cpp)" : "Speak via whisper.cpp"}
+            title={isRecording ? "Stop recording (click when done speaking)" : "Speak your Ayurvedic question"}
           >
             {transcribing ? (
               <Loader2 size={18} className="animate-spin" color="#2d6a4f" />
@@ -279,7 +446,7 @@ export default function ChatWindow({
         </form>
 
         <div className="input-legal-notice">
-          🌿 AyurBot is an educational assistant with whisper.cpp voice input. Consult healthcare professionals for medical advice.
+          🌿 AyurBot is an educational assistant with AI voice input. Consult healthcare professionals for medical advice.
         </div>
       </div>
     </div>
