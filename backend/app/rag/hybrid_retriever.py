@@ -23,11 +23,26 @@ class HybridRetriever:
         vector_results = vector_store.search(query, top_k=candidate_k, category=None)
         bm25_results = bm25_retriever.search(query, top_k=candidate_k, category=None)
 
-        # Relevance guardrail: if query has 0 BM25 match and weak vector similarity, return empty
+        # Relevance guardrail: if query has 0 BM25 match and weak vector similarity,
+        # attempt fallback search with canonical Ayurveda entities recognized in the query
         max_bm25 = max([item.get("score", 0) for item in bm25_results], default=0.0)
         max_vector = max([item.get("score", 0) for item in vector_results], default=0.0)
         if max_bm25 == 0.0 and max_vector < 0.36:
-            return []
+            try:
+                from backend.app.rag.spelling import spell_corrector
+                res = spell_corrector.process_query(query)
+                if res.canonical_terms:
+                    fallback_query = " ".join(res.canonical_terms)
+                    vector_results = vector_store.search(fallback_query, top_k=candidate_k, category=None)
+                    bm25_results = bm25_retriever.search(fallback_query, top_k=candidate_k, category=None)
+                    max_bm25 = max([item.get("score", 0) for item in bm25_results], default=0.0)
+                    max_vector = max([item.get("score", 0) for item in vector_results], default=0.0)
+                    if max_bm25 == 0.0 and max_vector < 0.20:
+                        return []
+                else:
+                    return []
+            except Exception:
+                return []
 
         # Reciprocal Rank Fusion (RRF) with balanced weights & category prioritization boost
         doc_scores: Dict[str, float] = {}

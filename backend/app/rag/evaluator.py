@@ -20,7 +20,7 @@ class RAGEvaluator:
                 "total_questions": 0
             }
 
-        with open(self.eval_path, "r", encoding="utf-8") as f:
+        with open(self.eval_path, "r", encoding="utf-8-sig") as f:
             questions: List[Dict[str, Any]] = json.load(f)
 
         total = len(questions)

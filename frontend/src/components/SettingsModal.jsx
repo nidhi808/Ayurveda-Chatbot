@@ -76,7 +76,7 @@ export default function SettingsModal({ onClose, currentModel }) {
               }}
             />
             <div style={{ fontSize: "11px", color: "#7a9184", marginTop: "4px" }}>
-              Stored locally in server runtime session. Keys are never logged or exposed.
+              Stored in local server configuration and persisted to .env. Keys are never exposed publicly.
             </div>
           </div>
 

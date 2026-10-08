@@ -30,6 +30,9 @@ class ChatResponse(BaseModel):
     safety_triggered: bool = False
     safety_reason: Optional[str] = None
     suggested_followups: Optional[List[str]] = None
+    interpreted_query: Optional[str] = None
+    corrected_terms: Optional[Dict[str, str]] = None
+    image: Optional[Dict[str, str]] = None
 
 class TranscribeResponse(BaseModel):
     text: str

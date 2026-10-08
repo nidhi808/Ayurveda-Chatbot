@@ -4,6 +4,20 @@ import { X, ExternalLink, BookOpen, Layers, Bookmark } from "lucide-react";
 export default function SourceViewer({ source, onClose }) {
   if (!source) return null;
 
+  const getHerbImage = (title = "") => {
+    const t = title.toLowerCase();
+    if (t.includes("tulsi") || t.includes("ocimum")) return { url: "/images/herbs/tulsi.jpg", alt: "Tulsi (Holy Basil)" };
+    if (t.includes("ashwagandha") || t.includes("withania")) return { url: "/images/herbs/ashwagandha.jpg", alt: "Ashwagandha" };
+    if (t.includes("triphala")) return { url: "/images/herbs/triphala.jpg", alt: "Triphala" };
+    if (t.includes("amalaki") || t.includes("amla")) return { url: "/images/herbs/amla.jpg", alt: "Amalaki / Amla" };
+    if (t.includes("haridra") || t.includes("turmeric") || t.includes("curcuma")) return { url: "/images/herbs/turmeric.jpg", alt: "Haridra / Turmeric" };
+    if (t.includes("neem") || t.includes("nimba")) return { url: "/images/herbs/neem.jpg", alt: "Neem" };
+    if (t.includes("ayurveda") || t.includes("brihat trayi")) return { url: "/images/herbs/ayurveda.jpg", alt: "Classical Ayurveda" };
+    return null;
+  };
+
+  const herbImg = getHerbImage(source.title);
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-card" onClick={(e) => e.stopPropagation()}>
@@ -36,6 +50,11 @@ export default function SourceViewer({ source, onClose }) {
         </div>
 
         <div className="modal-content">
+          {herbImg && (
+            <div style={{ marginBottom: "16px", borderRadius: "12px", overflow: "hidden", maxHeight: "220px", border: "1px solid #d4e8dd" }}>
+              <img src={herbImg.url} alt={herbImg.alt} style={{ width: "100%", height: "220px", objectFit: "cover", display: "block" }} />
+            </div>
+          )}
           <div
             style={{
               display: "grid",

@@ -17,6 +17,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
 CORPUS_DIR = DATA_DIR / "corpus"
 INDEX_DIR = DATA_DIR / "indices"
+FEEDBACK_FILE = DATA_DIR / "feedbacks.json"
 
 # Gemini LLM & Embedding Settings
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or ""
@@ -36,5 +37,4 @@ CORS_ORIGINS = [
     "http://127.0.0.1:5173",
     "http://localhost:3000",
     "http://localhost:8000",
-    "*"
 ]

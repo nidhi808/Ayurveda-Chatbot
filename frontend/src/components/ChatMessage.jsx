@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { BookOpen, Copy, Check, ThumbsUp, ThumbsDown, ShieldAlert, Sparkles, ChevronDown, ChevronUp } from "lucide-react";
+import { BookOpen, Copy, Check, ThumbsUp, ThumbsDown, ShieldAlert, Sparkles, ChevronDown, ChevronUp, Image as ImageIcon } from "lucide-react";
 import { submitFeedback } from "../api";
 
 export default function ChatMessage({ message, onSelectSource, onSelectFollowup }) {
@@ -40,14 +40,16 @@ export default function ChatMessage({ message, onSelectSource, onSelectFollowup 
     const lines = text.split("\n");
     const blocks = [];
     let currentList = [];
+    let currentOrderedList = [];
 
     const flushList = () => {
       if (currentList.length > 0) {
-        blocks.push({
-          type: "list",
-          items: [...currentList]
-        });
+        blocks.push({ type: "list", items: [...currentList] });
         currentList = [];
+      }
+      if (currentOrderedList.length > 0) {
+        blocks.push({ type: "ordered-list", items: [...currentOrderedList] });
+        currentOrderedList = [];
       }
     };
 
@@ -57,14 +59,21 @@ export default function ChatMessage({ message, onSelectSource, onSelectFollowup 
         flushList();
         continue;
       }
-      if (line.startsWith("### ")) {
+      if (line.startsWith("## ")) {
+        flushList();
+        blocks.push({ type: "h2", content: line.replace(/^##\s+/, "") });
+      } else if (line.startsWith("### ")) {
         flushList();
         blocks.push({ type: "h3", content: line.replace(/^###\s+/, "") });
       } else if (line.startsWith("#### ")) {
         flushList();
         blocks.push({ type: "h4", content: line.replace(/^####\s+/, "") });
       } else if (line.startsWith("• ") || line.startsWith("- ") || line.startsWith("* ")) {
+        if (currentOrderedList.length > 0) flushList();
         currentList.push(line.replace(/^[•\-\*]\s*/, ""));
+      } else if (/^\d+\.\s/.test(line)) {
+        if (currentList.length > 0) flushList();
+        currentOrderedList.push(line.replace(/^\d+\.\s*/, ""));
       } else {
         flushList();
         blocks.push({ type: "p", content: line });
@@ -73,6 +82,7 @@ export default function ChatMessage({ message, onSelectSource, onSelectFollowup 
     flushList();
 
     return blocks.map((b, idx) => {
+      if (b.type === "h2") return <h2 key={idx} style={{ fontSize: "17px", fontWeight: "700", margin: "14px 0 6px", color: "#143828" }}>{b.content}</h2>;
       if (b.type === "h3") return <h3 key={idx}>{b.content}</h3>;
       if (b.type === "h4") return <h4 key={idx}>{b.content}</h4>;
       if (b.type === "list") {
@@ -82,6 +92,15 @@ export default function ChatMessage({ message, onSelectSource, onSelectFollowup 
               <li key={itIdx} dangerouslySetInnerHTML={{ __html: parseBold(it) }} />
             ))}
           </ul>
+        );
+      }
+      if (b.type === "ordered-list") {
+        return (
+          <ol key={idx}>
+            {b.items.map((it, itIdx) => (
+              <li key={itIdx} dangerouslySetInnerHTML={{ __html: parseBold(it) }} />
+            ))}
+          </ol>
         );
       }
       return <p key={idx} dangerouslySetInnerHTML={{ __html: parseBold(b.content) }} />;
@@ -117,7 +136,41 @@ export default function ChatMessage({ message, onSelectSource, onSelectFollowup 
           </div>
         )}
 
+        {message.interpreted_query && (
+          <div className="interpreted-callout">
+            <Sparkles size={14} color="#2d6a4f" style={{ flexShrink: 0 }} />
+            <span>Understood topic: <strong>{message.interpreted_query}</strong></span>
+          </div>
+        )}
+
         <div className="bot-body-text">{formatBody(message.content)}</div>
+
+        {/* Botanical Herb / Concept Image Card */}
+        {message.image && (
+          <div className="herb-image-card">
+            <div className="herb-image-container">
+              <img
+                src={message.image.url}
+                alt={message.image.title}
+                className="herb-image-preview"
+                loading="lazy"
+              />
+              <div className="herb-image-badge">
+                <ImageIcon size={13} />
+                <span>Botanical Reference</span>
+              </div>
+            </div>
+            <div className="herb-image-details">
+              <div className="herb-image-title">{message.image.title}</div>
+              {message.image.botanical && (
+                <div className="herb-image-botanical">{message.image.botanical}</div>
+              )}
+              {message.image.caption && (
+                <div className="herb-image-caption">{message.image.caption}</div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Sources Accordion */}
         {message.sources && message.sources.length > 0 && (

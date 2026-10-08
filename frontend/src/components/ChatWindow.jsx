@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState } from "react";
 import { Send, Sparkles, Compass, Leaf, Sun, Flame, BookMarked, Mic, MicOff, Loader2 } from "lucide-react";
 import ChatMessage from "./ChatMessage";
 import { uploadAndTranscribeAudio } from "../api";
+import { convertBlobTo16kHzWav } from "../utils/audioUtils";
 
 const STARTER_PROMPTS = [
   {
@@ -104,17 +105,24 @@ export default function ChatWindow({
 
       mediaRecorder.onstop = async () => {
         stream.getTracks().forEach((track) => track.stop());
-        const audioBlob = new Blob(audioChunksRef.current, { type: "audio/wav" });
+        const rawBlob = new Blob(audioChunksRef.current, { type: mediaRecorder.mimeType || "audio/webm" });
 
-        if (audioBlob.size > 500) {
+        if (rawBlob.size > 500) {
           setTranscribing(true);
           try {
-            const data = await uploadAndTranscribeAudio(audioBlob, selectedLanguage);
+            // Convert browser audio into genuine 16kHz 16-bit mono RIFF WAV for whisper.cpp
+            const pcmWavBlob = await convertBlobTo16kHzWav(rawBlob);
+            const data = await uploadAndTranscribeAudio(pcmWavBlob, selectedLanguage);
             if (data && data.text && data.text.trim()) {
               setInputText(data.text.trim());
+            } else if (data && data.error) {
+              alert(`Voice input notice: ${data.error}\nYou can type your query directly in the input box.`);
+            } else {
+              alert("No speech was detected. Please try speaking closer to the microphone or type your query.");
             }
           } catch (err) {
             console.warn("[Voice] whisper.cpp local transcription error:", err);
+            alert("Voice transcription is unavailable. Please type your query in the input box.");
           } finally {
             setTranscribing(false);
           }
@@ -244,9 +252,11 @@ export default function ChatWindow({
               height: "38px",
               borderRadius: "10px",
               backgroundColor: isRecording ? "#fde8e8" : "transparent",
-              color: isRecording ? "#d94826" : "#607469"
+              color: isRecording ? "#d94826" : "#607469",
+              opacity: loading ? 0.5 : 1
             }}
             onClick={toggleRecording}
+            disabled={loading}
             title={isRecording ? "Stop recording (whisper.cpp)" : "Speak via whisper.cpp"}
           >
             {transcribing ? (

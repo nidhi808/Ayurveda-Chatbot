@@ -39,17 +39,27 @@ class EmbeddingService:
         """Fetches vector embedding for a single text string."""
         if self.client:
             try:
-                response = self.client.models.embed_content(
-                    model=self.model_name,
-                    contents=text
-                )
-                if response and hasattr(response, 'embedding') and hasattr(response.embedding, 'values'):
-                    return list(response.embedding.values)
-                elif hasattr(response, 'embeddings') and len(response.embeddings) > 0:
-                    return list(response.embeddings[0].values)
+                if self._is_legacy:
+                    # google.generativeai legacy API
+                    import google.generativeai as _genai_legacy
+                    response = _genai_legacy.embed_content(
+                        model=f"models/{self.model_name}",
+                        content=text
+                    )
+                    if response and "embedding" in response:
+                        return list(response["embedding"])
+                else:
+                    # google.genai modern SDK
+                    response = self.client.models.embed_content(
+                        model=self.model_name,
+                        contents=text
+                    )
+                    if response and hasattr(response, 'embedding') and hasattr(response.embedding, 'values'):
+                        return list(response.embedding.values)
+                    elif hasattr(response, 'embeddings') and len(response.embeddings) > 0:
+                        return list(response.embeddings[0].values)
             except Exception as e:
-                # Log and fallback gracefully
-                pass
+                print(f"[EmbeddingService] Embedding API error: {e}")
 
         return self._local_dense_embedding(text)
 

@@ -1,7 +1,9 @@
 import uuid
 import sys
+import json as _json
 from pathlib import Path
 from typing import List, Dict, Any, Optional
+from contextlib import asynccontextmanager
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE_DIR.parent))
@@ -12,7 +14,7 @@ if hasattr(sys.stdout, "reconfigure"):
 from fastapi import FastAPI, HTTPException, Query, Body, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.app.config import CORS_ORIGINS, GEMINI_MODEL, GEMINI_API_KEY
+from backend.app.config import CORS_ORIGINS, GEMINI_MODEL, GEMINI_API_KEY, CORPUS_DIR, FEEDBACK_FILE
 from backend.app.models import (
     ChatRequest,
     ChatResponse,
@@ -33,12 +35,67 @@ from backend.app.rag.vector_store import vector_store
 from backend.app.rag.evaluator import rag_evaluator
 from backend.app.rag.transcriber import whisper_transcriber
 from backend.app.rag.multilingual import detect_language, expand_multilingual_query
+from backend.app.rag.spelling import spell_corrector
+from backend.app.rag.images import detect_image_for_query
+from backend.app.rag.consultation import AyurvedicConsultationEngine, SYMPTOM_CATEGORIES
 from backend.ingest import load_and_index_corpus
+
+# ---------------------------------------------------------------------------
+# Feedback persistence helpers
+# ---------------------------------------------------------------------------
+def _load_feedbacks() -> List[Dict[str, Any]]:
+    if FEEDBACK_FILE.exists():
+        try:
+            with open(FEEDBACK_FILE, "r", encoding="utf-8") as f:
+                return _json.load(f)
+        except Exception:
+            return []
+    return []
+
+def _save_feedbacks():
+    FEEDBACK_FILE.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with open(FEEDBACK_FILE, "w", encoding="utf-8") as f:
+            _json.dump(feedbacks_db, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"[Feedback] Warning: could not persist feedback: {e}")
+
+# Persistent feedback store (loaded from disk on startup)
+feedbacks_db: List[Dict[str, Any]] = _load_feedbacks()
+
+# ---------------------------------------------------------------------------
+# Application Lifespan (replaces deprecated @app.on_event("startup"))
+# ---------------------------------------------------------------------------
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Startup: ensure vector store and BM25 index are loaded and synchronized."""
+    corpus_files = list(CORPUS_DIR.glob("*.json"))
+    corpus_chunks_count = 0
+    for fpath in corpus_files:
+        try:
+            with open(fpath, "r", encoding="utf-8") as f:
+                data = _json.load(f)
+                if isinstance(data, list):
+                    corpus_chunks_count += len(data)
+        except Exception:
+            pass
+
+    sample_vec = embedding_service.get_embedding("Ayurveda")
+    dim_mismatch = (vector_store.vectors.ndim == 2 and vector_store.vectors.size > 0 and vector_store.vectors.shape[1] != len(sample_vec))
+
+    if len(vector_store.chunks) != corpus_chunks_count or len(vector_store.chunks) == 0 or dim_mismatch:
+        reason = f"Embedding dimension mismatch ({vector_store.vectors.shape[1]} vs {len(sample_vec)})" if dim_mismatch else f"{corpus_chunks_count} corpus chunks vs {len(vector_store.chunks)} in index"
+        print(f"[Startup] Corpus sync needed ({reason}). Re-indexing...")
+        load_and_index_corpus()
+    else:
+        print(f"[Startup] Knowledge base ready with {len(vector_store.chunks)} document chunks.")
+    yield  # Application runs here
 
 app = FastAPI(
     title="AyurBot API — AI-Powered Ayurveda Knowledge Assistant",
     description="Educational RAG API providing source-grounded Ayurveda explanations with dual-layer safety guardrails.",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 app.add_middleware(
@@ -48,32 +105,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# In-memory feedback store
-feedbacks_db: List[Dict[str, Any]] = []
-
-from backend.app.config import CORS_ORIGINS, GEMINI_MODEL, GEMINI_API_KEY, CORPUS_DIR
-
-@app.on_event("startup")
-def startup_event():
-    """Ensure vector store and BM25 index are loaded and synchronized on startup."""
-    corpus_files = list(CORPUS_DIR.glob("*.json"))
-    corpus_chunks_count = 0
-    import json
-    for fpath in corpus_files:
-        try:
-            with open(fpath, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                if isinstance(data, list):
-                    corpus_chunks_count += len(data)
-        except Exception:
-            pass
-
-    if len(vector_store.chunks) != corpus_chunks_count or len(vector_store.chunks) == 0:
-        print(f"[Startup] Corpus sync needed ({corpus_chunks_count} corpus chunks vs {len(vector_store.chunks)} in index). Re-indexing...")
-        load_and_index_corpus()
-    else:
-        print(f"[Startup] Knowledge base ready with {len(vector_store.chunks)} document chunks.")
 
 @app.get("/api/health")
 def health_check():
@@ -136,6 +167,11 @@ def chat_endpoint(request: ChatRequest):
         )
 
     # -------------------------------------------------------------
+    # Spell Correction & Phonetic Intent Normalization
+    # -------------------------------------------------------------
+    spell_res = spell_corrector.process_query(user_query)
+
+    # -------------------------------------------------------------
     # Multi-turn Context Resolution
     # -------------------------------------------------------------
     history_context = memory_store.format_history_for_prompt(conversation_id)
@@ -154,17 +190,89 @@ def chat_endpoint(request: ChatRequest):
         category=request.category
     )
 
-    # -------------------------------------------------------------
-    # Grounded Generation & Layer 2 Output Validation
-    # -------------------------------------------------------------
-    raw_answer = rag_generator.generate(
-        query=user_query,
-        citations=citations,
-        conversation_context=history_context,
-        language=lang
-    )
+    # Secondary canonical entity fallback if initial hybrid search had zero citations
+    if not citations and spell_res.canonical_terms:
+        fallback_query = " ".join(spell_res.canonical_terms)
+        citations = hybrid_retriever.retrieve(
+            query=fallback_query,
+            top_k=4,
+            category=request.category
+        )
 
-    final_answer = SafetyClassifier.validate_output(raw_answer)
+    # -------------------------------------------------------------
+    # Clinical Intake & Symptom Consultation Workflow (Rogi Pariksha)
+    # -------------------------------------------------------------
+    symptom_match = AyurvedicConsultationEngine.detect_symptom_intent(user_query)
+
+    # Check if prior conversation turn was asking Rogi Pariksha intake questions
+    prior_consultation_key = None
+    if not symptom_match and history_context:
+        hist_lower = history_context.lower()
+        for cat_k, cat_inf in SYMPTOM_CATEGORIES.items():
+            titles_to_check = [cat_inf["title"].lower()]
+            if "title_lang" in cat_inf:
+                titles_to_check.extend([t.lower() for t in cat_inf["title_lang"].values()])
+            if any(t in hist_lower for t in titles_to_check):
+                prior_consultation_key = cat_k
+                break
+
+
+    consultation_active = bool(symptom_match or prior_consultation_key)
+    consultation_cat_key = symptom_match[0] if symptom_match else prior_consultation_key
+    consultation_cat_info = symptom_match[1] if symptom_match else (SYMPTOM_CATEGORIES[prior_consultation_key] if prior_consultation_key else None)
+
+    if consultation_active and consultation_cat_key and consultation_cat_info:
+        intake_data = AyurvedicConsultationEngine.extract_intake_data(user_query, conversation_context=history_context)
+        is_complete = AyurvedicConsultationEngine.is_intake_complete(intake_data)
+        default_herb = consultation_cat_info.get("default_herb", "tulsi")
+
+        if not is_complete:
+            # Stage 1: Clarifying Rogi Pariksha Intake Questions tailored to user symptom
+            raw_answer, followups = AyurvedicConsultationEngine.generate_intake_questions(
+                cat_key=consultation_cat_key,
+                cat_info=consultation_cat_info,
+                user_query=user_query,
+                lang=lang
+            )
+        else:
+            # Stage 2: Provide Tailored Ayurvedic Protocol with herbs, timing & sewan vidhi
+            raw_answer = AyurvedicConsultationEngine.generate_tailored_protocol(
+                cat_key=consultation_cat_key,
+                intake_data=intake_data,
+                citations=citations,
+                lang=lang
+            )
+            followups = [
+                "What diet (Pathya) should I follow?",
+                "Can I take this with warm water or honey?",
+                "How long before I see relief?"
+            ] if lang == "en" else [
+                "इसके साथ क्या पथ्य (खान-पान) रखना चाहिए?",
+                "क्या इसे गुनगुने पानी या शहद के साथ लें?",
+                "आराम मिलने में कितने दिन लगेंगे?"
+            ] if lang == "hi" else [
+                "यासोबत कोणता आहार (पथ्य) पाळावा?",
+                "कोमट पाण्यासोबत घ्यावे की मधासोबत?",
+                "कधीपर्यंत आराम मिळेल?"
+            ]
+
+        final_answer = SafetyClassifier.validate_output(raw_answer)
+        detected_img = detect_image_for_query(
+            user_query,
+            canonical_terms=spell_res.canonical_terms,
+            fallback_herb=default_herb
+        )
+    else:
+        # Standard Grounded Generation & Layer 2 Output Validation
+        raw_answer = rag_generator.generate(
+            query=user_query,
+            citations=citations,
+            conversation_context=history_context,
+            language=lang
+        )
+        final_answer = SafetyClassifier.validate_output(raw_answer)
+        followups = _generate_followup_suggestions(user_query, citations, lang=lang)
+        detected_img = detect_image_for_query(user_query, canonical_terms=spell_res.canonical_terms)
 
     # Record assistant message with sources
     memory_store.add_message(
@@ -174,9 +282,6 @@ def chat_endpoint(request: ChatRequest):
         sources=citations
     )
 
-    # Dynamic follow-up questions
-    followups = _generate_followup_suggestions(user_query, citations, lang=lang)
-
     return ChatResponse(
         conversation_id=conversation_id,
         message_id=message_id,
@@ -185,7 +290,10 @@ def chat_endpoint(request: ChatRequest):
         category=request.category or (citations[0].category if citations else None),
         language=lang,
         safety_triggered=False,
-        suggested_followups=followups
+        suggested_followups=followups,
+        interpreted_query=spell_res.display_interpretation if spell_res.corrections else None,
+        corrected_terms=spell_res.corrections if spell_res.corrections else None,
+        image=detected_img
     )
 
 @app.post("/api/transcribe", response_model=TranscribeResponse)
@@ -224,8 +332,12 @@ async def transcribe_audio(
         )
 
 @app.get("/api/sources", response_model=List[SourceCitation])
-def get_sources(category: Optional[str] = None):
-    """Returns all or filtered knowledge sources available in the corpus."""
+def get_sources(
+    category: Optional[str] = None,
+    skip: int = Query(0, ge=0, description="Number of results to skip (for pagination)"),
+    limit: int = Query(100, ge=1, le=500, description="Max results to return")
+):
+    """Returns paginated, optionally filtered knowledge sources available in the corpus."""
     results = []
     for c in vector_store.chunks:
         if category and category.lower() != "all" and c.get("category", "").lower() != category.lower():
@@ -242,7 +354,7 @@ def get_sources(category: Optional[str] = None):
             snippet=c.get("content", "")[:280] + "...",
             content=c.get("content", "")
         ))
-    return results
+    return results[skip: skip + limit]
 
 @app.get("/api/sources/{doc_id}", response_model=SourceCitation)
 def get_source_by_id(doc_id: str):
@@ -288,13 +400,14 @@ def get_conversation_history(conversation_id: str):
 
 @app.post("/api/feedback", response_model=FeedbackResponse)
 def post_feedback(request: FeedbackRequest):
-    """Records user feedback rating and comments."""
+    """Records user feedback rating and comments (persisted to disk)."""
     feedback_entry = {
         "message_id": request.message_id,
         "rating": request.rating,
         "feedback": request.feedback
     }
     feedbacks_db.append(feedback_entry)
+    _save_feedbacks()
     return FeedbackResponse(status="success", message_id=request.message_id)
 
 @app.get("/api/evaluate", response_model=EvaluationMetric)
@@ -315,7 +428,30 @@ def configure_api_key(payload: Dict[str, str] = Body(...)):
     rag_generator.init_client()
     embedding_service.api_key = key
     embedding_service.init_client()
-    return {"status": "configured", "message": "Gemini API key updated successfully."}
+
+    # Persist key to .env file
+    env_path = BASE_DIR.parent / ".env"
+    try:
+        if env_path.exists():
+            content = env_path.read_text(encoding="utf-8")
+            lines = content.splitlines()
+            updated = False
+            new_lines = []
+            for line in lines:
+                if line.startswith("GEMINI_API_KEY="):
+                    new_lines.append(f"GEMINI_API_KEY={key}")
+                    updated = True
+                else:
+                    new_lines.append(line)
+            if not updated:
+                new_lines.append(f"GEMINI_API_KEY={key}")
+            env_path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+        else:
+            env_path.write_text(f"GEMINI_API_KEY={key}\n", encoding="utf-8")
+    except Exception as e:
+        print(f"[Config] Warning: could not persist key to .env: {e}")
+
+    return {"status": "configured", "message": "Gemini API key updated and persisted successfully."}
 
 def _generate_followup_suggestions(query: str, citations: List[SourceCitation], lang: str = "en") -> List[str]:
     """Generates 2-3 logical follow-up questions based on query and retrieved topics."""

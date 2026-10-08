@@ -68,7 +68,7 @@ export default function App() {
     }
     const current = conversations.find((c) => c.id === activeConversationId);
     if (current) {
-      setMessages(current.messages || []);
+      setMessages(Array.isArray(current.messages) ? current.messages : []);
     }
   }, [activeConversationId]);
 
@@ -125,6 +125,9 @@ export default function App() {
         safety_triggered: response.safety_triggered,
         safety_reason: response.safety_reason,
         suggested_followups: response.suggested_followups || [],
+        interpreted_query: response.interpreted_query,
+        corrected_terms: response.corrected_terms,
+        image: response.image,
         timestamp: new Date().toLocaleTimeString()
       };
 

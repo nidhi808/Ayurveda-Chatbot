@@ -14,9 +14,10 @@ EMERGENCY_KEYWORDS = [
     r"\bunconscious\b",
     r"\bdifficulty\s+breathing\b",
     r"\bshortness\s+of\s+breath\b",
-    r"\bvomiting\b",
     r"\banaphylaxis\b",
     r"\bfever\s+of\s+10\d",
+    r"\bsevere\s+vomiting\b",
+    r"\bblood\s+(?:in\s+)?vomit\b",
     # Hindi / Hinglish Emergency terms
     r"\b(?:tez|bahut|asahaaniya)\s+(?:dard|peeda)\b",
     r"\bchhati\s+me\s+dard\b",

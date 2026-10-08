@@ -22,11 +22,12 @@ export async function fetchCategories() {
   }
 }
 
-export async function sendChatMessage({ conversation_id, message, category }) {
+export async function sendChatMessage({ conversation_id, message, category, language }) {
   const payload = {
     conversation_id: conversation_id || null,
     message,
-    category: category && category !== "All" ? category : null
+    category: category && category !== "All" ? category : null,
+    language: language || "auto"
   };
 
   const res = await fetch(`${API_BASE}/chat`, {
@@ -43,11 +44,14 @@ export async function sendChatMessage({ conversation_id, message, category }) {
   return await res.json();
 }
 
-export async function fetchSources(category = null) {
+export async function fetchSources(category = null, skip = 0, limit = 100) {
   try {
-    const url = category && category !== "All"
-      ? `${API_BASE}/sources?category=${encodeURIComponent(category)}`
-      : `${API_BASE}/sources`;
+    const params = new URLSearchParams();
+    if (category && category !== "All") params.append("category", category);
+    if (skip > 0) params.append("skip", String(skip));
+    if (limit) params.append("limit", String(limit));
+    const qs = params.toString();
+    const url = qs ? `${API_BASE}/sources?${qs}` : `${API_BASE}/sources`;
     const res = await fetch(url);
     if (!res.ok) throw new Error("Failed to fetch sources");
     return await res.json();

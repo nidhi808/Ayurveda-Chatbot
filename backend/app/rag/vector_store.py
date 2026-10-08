@@ -48,6 +48,11 @@ class VectorStore:
             return []
 
         query_vec = np.array(embedding_service.get_embedding(query), dtype=np.float32)
+        if self.vectors.ndim == 2 and self.vectors.size > 0 and self.vectors.shape[1] != query_vec.shape[0]:
+            print(f"[VectorStore] Embedding dimension mismatch ({self.vectors.shape[1]} vs {query_vec.shape[0]}). Re-indexing corpus with active embedding model...")
+            from backend.ingest import load_and_index_corpus
+            load_and_index_corpus()
+
         q_norm = np.linalg.norm(query_vec)
         if q_norm > 0:
             query_vec = query_vec / q_norm

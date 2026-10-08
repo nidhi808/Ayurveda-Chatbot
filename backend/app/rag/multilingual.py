@@ -5,8 +5,11 @@ from typing import Dict, List, Tuple
 HINGLISH_MARKERS = {
     "ke", "liye", "kya", "hai", "kaise", "fayde", "konsi", "konsa", "aushadhi",
     "dawa", "dawai", "hota", "hoti", "kare", "karna", "batao", "chahiye", "kaun",
-    "khasi", "bukhar", "dard", "aur", "mein", "kab", "kisko", "peena", "khana"
+    "khasi", "khansi", "bukhar", "dard", "aur", "mein", "kab", "kisko", "peena", "khana",
+    "mujhe", "muze", "din", "se", "bahut", "tez", "ho", "rahi", "raha", "gaya", "gayi",
+    "bimari", "beemari", "umar", "saal", "takleef", "pareshani", "jalan", "sujan", "pet"
 }
+
 
 # Common Romanized Marathi markers
 MARATHI_MARKERS = {
@@ -38,11 +41,12 @@ def detect_language(text: str) -> str:
     total_chars = len(re.findall(r"\w", text))
 
     if total_chars > 0 and (devanagari_chars / total_chars) > 0.3:
-        if "ः" in text or "म्" in text or "संस्कृत" in text or "इति" in text:
+        if any(w in text for w in ["संस्कृत", "इति", "अस्ति", "भवति", "नमः", "किम्", "कथम्", "अहम्"]):
             return "sa"
         elif any(w in text for w in ["आहे", "काय", "करावे", "मराठी", "खोकला", "खोकल्यासाठी", "औषध", "उपाय", "साठी", "सांगा", "कसे", "त्रास", "तुळस", "हळद", "गुळवेल", "पोटदुखी", "ताप"]):
             return "mr"
         return "hi"
+
     return "en"
 
 # Enhanced Ayurveda Multilingual, Marathi & Hinglish Glossary
@@ -153,17 +157,38 @@ AYURVEDA_GLOSSARY: Dict[str, List[str]] = {
 
 def expand_multilingual_query(query: str) -> str:
     """
-    Expands a Marathi, Hindi, or Sanskrit query with English Ayurvedic transliterations
-    to maximize hybrid vector and BM25 retrieval accuracy against the corpus.
+    Expands a Marathi, Hindi, Sanskrit, or English query with spell correction,
+    typo normalization, and Ayurvedic synonyms to maximize hybrid vector and BM25 retrieval.
     """
+    from backend.app.rag.spelling import spell_corrector
+
+    correction_res = spell_corrector.process_query(query)
+
     expanded_terms = [query]
-    q_lower = query.lower()
-    
+    if correction_res.normalized_query != query:
+        expanded_terms.append(correction_res.normalized_query)
+
+    expanded_terms.extend(correction_res.expansion_terms)
+
+    combined_text = f"{query} {correction_res.normalized_query}".lower()
     for term, eng_synonyms in AYURVEDA_GLOSSARY.items():
-        if term.lower() in q_lower:
+        if term.lower() in combined_text:
             expanded_terms.extend(eng_synonyms)
 
-    return " ".join(expanded_terms)
+    # Add canonical titles if matched
+    for title in correction_res.canonical_terms:
+        expanded_terms.append(title)
+
+    # Deduplicate while preserving order
+    seen = set()
+    deduped = []
+    for t in expanded_terms:
+        t_clean = t.strip()
+        if t_clean and t_clean.lower() not in seen:
+            seen.add(t_clean.lower())
+            deduped.append(t_clean)
+
+    return " ".join(deduped)
 
 def get_language_instructions(target_lang: str) -> str:
     """Provides system prompt instructions based on selected target language."""
