@@ -21,8 +21,8 @@ FEEDBACK_FILE = DATA_DIR / "feedbacks.json"
 
 # Gemini LLM & Embedding Settings
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or ""
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
-EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-004")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite")
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "gemini-embedding-001")
 
 # RAG Settings
 TOP_K_RETRIEVAL = int(os.getenv("TOP_K_RETRIEVAL", "4"))

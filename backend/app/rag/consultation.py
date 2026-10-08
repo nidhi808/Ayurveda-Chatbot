@@ -148,8 +148,13 @@ class AyurvedicConsultationEngine:
         """Detects whether user query describes a symptom or health complaint."""
         q = query.lower().strip()
 
-        # Check explicit emergency keywords first (let safety classifier handle acute emergencies)
-        if any(w in q for w in ["heart attack", "stroke", "unconscious", "poisoning", "suicide"]):
+        # Educational/informational queries should be answered directly by RAG, not intercepted as clinical consultations
+        educational_markers = [
+            "what is", "what are", "tell me about", "explain", "describe", "benefits of", "properties of",
+            "which herbs", "herbs for", "remedy for", "remedies for", "treatment for", "fayde", "fyde",
+            "काय आहे", "माहिती सांगा", "फायदे", "गुणधर्म", "उपाय कोणते", "क्या है", "बताइए", "बताओ", "समझाइए"
+        ]
+        if any(marker in q for marker in educational_markers):
             return None
 
         for cat_key, info in SYMPTOM_CATEGORIES.items():

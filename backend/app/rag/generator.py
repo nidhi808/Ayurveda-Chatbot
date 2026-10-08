@@ -137,33 +137,40 @@ Please provide an educational, clear, and grounded explanation based strictly on
 
         prompt = self.build_prompt(query, citations, conversation_context, language=language)
 
-        # Attempt Gemini API call if client is available
+        # Attempt Gemini API call if client is available with resilient multi-model fallback
         if self.client:
-            try:
-                if self._is_legacy:
-                    # google.generativeai GenerativeModel
-                    response = self.client.generate_content(
-                        prompt,
-                        generation_config={
-                            "temperature": 0.2,
-                            "max_output_tokens": 1024,
-                        }
-                    )
-                else:
-                    # modern google.genai Client
-                    response = self.client.models.generate_content(
-                        model=self.model_name,
-                        contents=prompt,
-                        config={
-                            "system_instruction": SYSTEM_PROMPT,
-                            "temperature": 0.2,
-                            "max_output_tokens": 1024,
-                        }
-                    )
-                if response and hasattr(response, 'text') and response.text:
-                    return SafetyClassifier.validate_output(response.text)
-            except Exception as e:
-                print(f"[RAGGenerator] Gemini API error, falling back to grounded synthesizer: {e}")
+            models_to_try = [self.model_name]
+            for fallback_m in ["gemini-3.1-flash-lite", "gemini-2.5-flash-lite"]:
+                if fallback_m not in models_to_try:
+                    models_to_try.append(fallback_m)
+
+            for target_model in models_to_try:
+                try:
+                    if self._is_legacy:
+                        # google.generativeai GenerativeModel
+                        response = self.client.generate_content(
+                            prompt,
+                            generation_config={
+                                "temperature": 0.2,
+                                "max_output_tokens": 1024,
+                            }
+                        )
+                    else:
+                        # modern google.genai Client
+                        response = self.client.models.generate_content(
+                            model=target_model,
+                            contents=prompt,
+                            config={
+                                "system_instruction": SYSTEM_PROMPT,
+                                "temperature": 0.2,
+                                "max_output_tokens": 1024,
+                            }
+                        )
+                    if response and hasattr(response, 'text') and response.text:
+                        return SafetyClassifier.validate_output(response.text)
+                except Exception as e:
+                    print(f"[RAGGenerator] Model '{target_model}' error: {e}. Trying fallback...")
+                    continue
 
         # Intelligent grounded synthesis fallback
         return self._synthesize_grounded_response(query, citations, language=language)
@@ -466,7 +473,7 @@ Please provide an educational, clear, and grounded explanation based strictly on
             if mono['sci']:
                 response_parts.append(f"\n#### 🔬 आधुनिक वैज्ञानिक संशोधन: {mono['sci']}")
 
-        elif is_cough_query or "tulsi" in primary.title.lower() or "yashtimadhu" in primary.title.lower() or "sitopaladi" in primary.title.lower():
+        elif is_cough_query:
             response_parts.append(f"### {mr_title}\n")
             response_parts.append(
                 "आयुर्वेदानुसार खोकला हा **'कास'** रोग मानला जातो, जो मुख्यत्वे **कफ आणि वात दोषाच्या असंतुलनामुळे** "
@@ -479,7 +486,7 @@ Please provide an educational, clear, and grounded explanation based strictly on
                 "• **सितोपलादि चूर्ण (Sitopaladi Churna)**: हे खोकला आणि कफासाठीचे प्रसिद्ध शास्त्रीय चूर्ण आहे. हे मध आणि साजूक तुपासोबत घेतले जाते.\n"
                 "• **सुंठ आणि कोमट पाणी**: सुंठ पावडर मधात मिसळून घेतल्याने कफ वितळतो आणि पचन सुधारते."
             )
-        elif is_period_query or "rajaswala" in primary.title.lower() or "shatavari" in primary.title.lower() or "ashoka" in primary.title.lower():
+        elif is_period_query:
             response_parts.append(f"### {mr_title}\n")
             response_parts.append(
                 "आयुर्वेदात मासिक पाळी ही शरीराचे नैसर्गिक शुद्धीकरण मानले जाते. ही प्रक्रिया मुख्यत्वे **अपान वायू** आणि **आर्तव धातू** यांच्या संतुलनावर अवलंबून असते. "
@@ -592,7 +599,7 @@ Please provide an educational, clear, and grounded explanation based strictly on
             if mono['uses']:
                 response_parts.append(f"\n#### ✨ मुख्य लाभ: {mono['uses']}")
 
-        elif is_cough_query or "tulsi" in primary.title.lower() or "sitopaladi" in primary.title.lower():
+        elif is_cough_query:
             response_parts.append(f"### {hi_title}\n")
             response_parts.append(
                 "आयुर्वेद में खांसी को **'कास'** कहा जाता है, जो मुख्य रूप से **कफ और वात दोष** के प्रकुपित होने से होती है। "
@@ -605,7 +612,7 @@ Please provide an educational, clear, and grounded explanation based strictly on
                 "• **सितोपलादि चूर्ण**: यह खांसी और जुकाम के लिए एक प्रसिद्ध शास्त्रीय औषधि है जिसे शहद और घी के साथ लिया जाता है।\n"
                 "• **सोंठ और गुड़**: सोंठ का सेवन कफ को संतुलित करता है और श्वसन तंत्र को गर्माहट देता है।"
             )
-        elif is_period_query or "rajaswala" in primary.title.lower() or "shatavari" in primary.title.lower() or "ashoka" in primary.title.lower():
+        elif is_period_query:
             response_parts.append(f"### {hi_title}\n")
             response_parts.append(
                 "आयुर्वेद में मासिक धर्म को एक अत्यंत महत्वपूर्ण प्राकृतिक शोधन प्रक्रिया माना गया है, जो मुख्य रूप से **अपान वायु** और **आर्तव धातु** के संतुलन से संचालित होती है। "
