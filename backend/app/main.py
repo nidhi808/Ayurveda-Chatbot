@@ -316,10 +316,12 @@ async def transcribe_audio(
             language=language if language != "auto" else None
         )
 
+        print(f"[API Transcribe] Received {len(content)} bytes (lang={language}) -> text: '{result.get('text')}' (engine: {result.get('engine')})")
+
         return TranscribeResponse(
             text=result.get("text", ""),
             language=result.get("language", language or "en"),
-            engine="whisper.cpp",
+            engine=result.get("engine", "whisper.cpp"),
             error=result.get("error")
         )
     except Exception as e:

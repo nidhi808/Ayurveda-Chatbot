@@ -68,18 +68,13 @@ class WhisperCppTranscriber:
                 with open(audio_path, "rb") as f:
                     data = f.read()
 
-                lang_name = (
-                    "Hindi" if language == "hi"
-                    else "Marathi" if language == "mr"
-                    else "Sanskrit" if language == "sa"
-                    else "English" if language == "en"
-                    else "multilingual (English, Hindi, or Marathi)"
-                )
+                # Clean, unbiased verbatim Speech-to-Text instruction
                 prompt = (
-                    f"Listen carefully to this audio recording. The speaker is talking in {lang_name} regarding Ayurveda or health. "
-                    "Transcribe the user's spoken words verbatim into text. "
-                    "If the audio contains only silence, noise, breathing, or no discernible words, reply with strictly empty text. "
-                    "Return ONLY the transcribed words. Do not include quotes, timestamps, or conversational commentary."
+                    "Transcribe the spoken audio verbatim into text. "
+                    "Do NOT translate. Do NOT summarize or answer. Do NOT substitute words. "
+                    "Preserve the exact words spoken by the speaker in the language they spoke (English, Hindi, Marathi, etc.). "
+                    "If the user says herb names (e.g., Ashwagandha, Tulsi, Shatavari, Giloy, etc.), transcribe the exact herb spoken. "
+                    "If the audio is silent or contains no intelligible words, return strictly nothing."
                 )
 
                 for model_candidate in ["gemini-3.1-flash-lite", "gemini-2.5-flash-lite"]:
@@ -92,8 +87,15 @@ class WhisperCppTranscriber:
                             ]
                         )
                         transcription = (res.text or "").strip()
-                        if transcription.lower() in ["[blank_audio]", "[silence]", "empty", "(silence)", "none"]:
+                        # Clean common silence/timestamp markers
+                        if transcription.lower() in [
+                            "00:00", "0:00", "00:00:00", "00:01",
+                            "[blank_audio]", "[silence]", "(silence)",
+                            "empty", "none", "nothing", "null"
+                        ]:
                             transcription = ""
+
+                        print(f"[Transcriber] Gemini ({model_candidate}) output: '{transcription}'")
                         return {
                             "text": transcription,
                             "language": language or "auto",

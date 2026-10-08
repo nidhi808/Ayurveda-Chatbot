@@ -148,22 +148,18 @@ export default function ChatWindow({
         stream.getTracks().forEach((track) => track.stop());
         const rawBlob = new Blob(audioChunksRef.current, { type: mediaRecorder.mimeType || "audio/webm" });
 
-        // If Web Speech API already transcribed the speech live, keep it
-        if (liveTranscriptRef.current && liveTranscriptRef.current.trim().length > 0) {
-          return;
-        }
-
-        // Otherwise, send recorded audio to Gemini / Whisper backend
+        // Always send recorded audio to Gemini AI backend for authoritative, accurate transcription
         if (rawBlob.size > 800) {
           setTranscribing(true);
           try {
             const pcmWavBlob = await convertBlobTo16kHzWav(rawBlob);
             const data = await uploadAndTranscribeAudio(pcmWavBlob, selectedLanguage);
             if (data && data.text && data.text.trim()) {
-              setInputText((prev) => {
-                const trimmed = data.text.trim();
-                return prev && !prev.includes(trimmed) ? `${prev} ${trimmed}`.trim() : trimmed;
-              });
+              // Authoritative Gemini transcription replaces any browser interim mishearing
+              setInputText(data.text.trim());
+            } else if (liveTranscriptRef.current && liveTranscriptRef.current.trim().length > 0) {
+              // Fallback to browser transcript if backend returned empty
+              setInputText(liveTranscriptRef.current.trim());
             } else if (data && data.error) {
               console.warn("[Voice] Backend notice:", data.error);
             } else {
@@ -171,7 +167,11 @@ export default function ChatWindow({
             }
           } catch (err) {
             console.error("[Voice] Backend transcription error:", err);
-            alert("Voice transcription could not be completed. You can type your question in the text box.");
+            if (liveTranscriptRef.current && liveTranscriptRef.current.trim().length > 0) {
+              setInputText(liveTranscriptRef.current.trim());
+            } else {
+              alert("Voice transcription could not be completed. You can type your question in the text box.");
+            }
           } finally {
             setTranscribing(false);
           }
@@ -191,7 +191,7 @@ export default function ChatWindow({
         }
       }, 1000);
 
-      // Concurrently run Web Speech Recognition if supported for live typing preview
+      // Concurrently run Web Speech Recognition for live typing preview while speaking
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (SpeechRecognition) {
         try {
@@ -220,7 +220,7 @@ export default function ChatWindow({
           };
 
           recognition.onerror = (event) => {
-            console.warn("[Voice] Web Speech API notice (audio will still be transcribed by Gemini backend):", event.error);
+            console.warn("[Voice] Web Speech API notice (audio will be transcribed by Gemini backend):", event.error);
           };
 
           recognition.onend = () => {};
